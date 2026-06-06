@@ -46,9 +46,11 @@ body { background: #0d1117; color: #e6edf3; font-family: "Segoe UI", sans-serif;
 .legend h3 { font-size: 13px; color: #8b949e; margin-bottom: 8px; }
 .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 6px; }
 .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
-.dot.high { background: #E74C3C; }
-.dot.medium { background: #F39C12; }
-.dot.low { background: #27AE60; }
+.dot.critical { background: #FF0000; }
+.dot.high { background: #FF4500; }
+.dot.medium { background: #FFA500; }
+.dot.low { background: #FFD700; }
+.dot.clear { background: #00CC44; }
 
 .loading { display: flex; align-items: center; justify-content: center; height: 100%; color: #8b949e; font-size: 16px; }
 

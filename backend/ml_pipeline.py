@@ -222,10 +222,10 @@ class TraceNetXMLPipeline:
 
     def classify_risk(self, score, features):
         # Graduated 5-level response system
-        if score >= 85:
+        if score >= 80:
             level = "CRITICAL"
             action = "Immediate freeze + STR filing + ED/CBI referral"
-        elif score >= 70:
+        elif score >= 65:
             level = "HIGH"
             action = "Account freeze + investigation + police referral"
         elif score >= 50:

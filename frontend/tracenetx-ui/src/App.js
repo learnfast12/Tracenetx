@@ -21,6 +21,8 @@ function App() {
   const [intelLoading, setIntelLoading] = useState(false);
   const [evidenceData, setEvidenceData] = useState(null);
   const [evidenceLoading, setEvidenceLoading] = useState(false);
+  const [temporalData, setTemporalData] = useState(null);
+  const [temporalLoading, setTemporalLoading] = useState(false);
 
   const fetchGraph = async (activeFilters = {}) => {
     setLoading(true);
@@ -79,6 +81,16 @@ function App() {
     setEvidenceLoading(false);
   };
 
+  const fetchTemporal = async () => {
+    setTemporalLoading(true);
+    try {
+      const res = await fetch("http://localhost:8000/temporal/analyze");
+      const data = await res.json();
+      setTemporalData(data);
+    } catch (e) { console.error(e); }
+    setTemporalLoading(false);
+  };
+
   const handleCaseSwitch = (caseId) => {
     setActiveCase(caseId);
     setSelectedNode(null);
@@ -117,6 +129,7 @@ function App() {
     setActiveTab(tab);
     if (tab === "ml" && !mlData) fetchML();
     if (tab === "intelligence" && !intelData) fetchIntelligence();
+    if (tab === "temporal" && !temporalData) fetchTemporal();
   };
 
   const getRiskColor = (level) => {
@@ -173,6 +186,7 @@ function App() {
             ["map","🕸 Spider Map"],
             ["ml","🤖 ML Analysis"],
             ["intelligence","🧠 Intelligence"],
+            ["temporal","⏱ Temporal"],
             ["dashboard","📊 Dashboard"],
             ["citymap","🗺 City Map"]
           ].map(([id, label]) => (
@@ -199,11 +213,11 @@ function App() {
               </div>
               <div className="legend">
                 <h3>Risk Legend</h3>
-                <div className="legend-item"><span className="dot" style={{background:"#FF0000"}}></span>Critical</div>
+                <div className="legend-item"><span className="dot critical"></span>Critical</div>
                 <div className="legend-item"><span className="dot high"></span>High Risk</div>
                 <div className="legend-item"><span className="dot medium"></span>Medium Risk</div>
                 <div className="legend-item"><span className="dot low"></span>Low Risk</div>
-                <div className="legend-item"><span className="dot" style={{background:"#00CC44"}}></span>Clear</div>
+                <div className="legend-item"><span className="dot clear"></span>Clear</div>
               </div>
               <PathFinder nodes={graphData.nodes} />
             </div>
@@ -297,7 +311,6 @@ function App() {
             {intelData && (
               <div style={{display:"flex", flexDirection:"column", gap:"20px"}}>
 
-                {/* Community Detection */}
                 <div style={{background:"#0a0a1a", border:"1px solid #0044ff", borderRadius:"8px", padding:"20px"}}>
                   <h3 style={{color:"#4488ff", marginBottom:"15px"}}>🔵 Community Detection — Mule Clusters</h3>
                   <p style={{color:"#666", marginBottom:"15px"}}>{intelData.community_detection?.analysis}</p>
@@ -316,19 +329,14 @@ function App() {
                   </div>
                 </div>
 
-                {/* Coordination Detection */}
                 <div style={{background:"#1a0a00", border:"1px solid #ff6600", borderRadius:"8px", padding:"20px"}}>
                   <h3 style={{color:"#ff8800", marginBottom:"15px"}}>⚡ Coordination Detection — Synchronized Bursts</h3>
                   <p style={{color:"#666", marginBottom:"15px"}}>{intelData.coordination_detection?.analysis}</p>
                   <div style={{display:"flex", flexDirection:"column", gap:"8px"}}>
                     {intelData.coordination_detection?.coordinated_bursts?.map((b, i) => (
                       <div key={i} style={{background:"#111", border:"1px solid #aa4400", borderRadius:"6px", padding:"12px"}}>
-                        <div style={{color:"#ff8800", fontWeight:"bold", marginBottom:"4px"}}>
-                          ⚠ {b.alert}
-                        </div>
-                        <div style={{color:"#888", fontSize:"0.85em"}}>
-                          Window: {b.window_start} → {b.window_end}
-                        </div>
+                        <div style={{color:"#ff8800", fontWeight:"bold", marginBottom:"4px"}}>⚠ {b.alert}</div>
+                        <div style={{color:"#888", fontSize:"0.85em"}}>Window: {b.window_start} → {b.window_end}</div>
                         <div style={{color:"#888", fontSize:"0.85em"}}>
                           Accounts: {b.accounts_involved?.join(", ")} | Txns: {b.transaction_count} | Amount: ₹{(b.total_amount/100000).toFixed(1)}L
                         </div>
@@ -337,42 +345,33 @@ function App() {
                   </div>
                 </div>
 
-                {/* Identity Fusion */}
                 <div style={{background:"#0a1a0a", border:"1px solid #00aa44", borderRadius:"8px", padding:"20px"}}>
                   <h3 style={{color:"#00ff88", marginBottom:"15px"}}>🔗 Identity Fusion — Shared Identifiers</h3>
                   <p style={{color:"#666", marginBottom:"15px"}}>{intelData.identity_fusion?.analysis}</p>
                   <div style={{display:"flex", flexDirection:"column", gap:"8px"}}>
                     {intelData.identity_fusion?.identity_links?.map((l, i) => (
                       <div key={i} style={{background:"#111", border:"1px solid #005522", borderRadius:"6px", padding:"12px"}}>
-                        <div style={{color:"#00ff88", fontWeight:"bold"}}>
-                          {l.account1} ↔ {l.account2}
-                        </div>
-                        <div style={{color:"#888", fontSize:"0.85em"}}>
-                          Shared IP: {l.shared_ip} | City: {l.city}
-                        </div>
+                        <div style={{color:"#00ff88", fontWeight:"bold"}}>{l.account1} ↔ {l.account2}</div>
+                        <div style={{color:"#888", fontSize:"0.85em"}}>Shared IP: {l.shared_ip} | City: {l.city}</div>
                         <div style={{color:"#ff8800", fontSize:"0.8em"}}>{l.alert}</div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Convergence Analysis */}
                 <div style={{background:"#1a001a", border:"1px solid #aa00ff", borderRadius:"8px", padding:"20px"}}>
                   <h3 style={{color:"#cc44ff", marginBottom:"15px"}}>🎯 Convergence Analysis — Lieutenant Nodes</h3>
                   <p style={{color:"#666", marginBottom:"15px"}}>{intelData.convergence_analysis?.analysis}</p>
                   <div style={{display:"flex", flexDirection:"column", gap:"8px"}}>
                     {intelData.convergence_analysis?.potential_lieutenants?.map((l, i) => (
                       <div key={i} style={{background:"#111", border:"1px solid #660088", borderRadius:"6px", padding:"12px"}}>
-                        <div style={{color:"#cc44ff", fontWeight:"bold"}}>
-                          🎯 {l.account} — {l.source_count} source chains
-                        </div>
+                        <div style={{color:"#cc44ff", fontWeight:"bold"}}>🎯 {l.account} — {l.source_count} source chains</div>
                         <div style={{color:"#888", fontSize:"0.85em"}}>{l.threat}</div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Batch Recruitment */}
                 <div style={{background:"#1a1a00", border:"1px solid #aaaa00", borderRadius:"8px", padding:"20px"}}>
                   <h3 style={{color:"#ffff00", marginBottom:"15px"}}>👥 Batch Recruitment Detection</h3>
                   <p style={{color:"#666", marginBottom:"15px"}}>{intelData.batch_recruitment?.analysis}</p>
@@ -386,7 +385,136 @@ function App() {
                   </div>
                 </div>
 
+
+                <div style={{background:"#1a0a1a", border:"1px solid #ff00aa", borderRadius:"8px", padding:"20px"}}>
+                  <h3 style={{color:"#ff44cc", marginBottom:"15px"}}>🏦 Hawala Broker Detection</h3>
+                  <p style={{color:"#666", marginBottom:"15px"}}>{intelData.hawala_detection?.analysis}</p>
+                  <div style={{display:"flex", flexDirection:"column", gap:"8px"}}>
+                    {intelData.hawala_detection?.brokers?.map((b, i) => (
+                      <div key={i} style={{background:"#111", border:"1px solid #880055", borderRadius:"6px", padding:"12px"}}>
+                        <div style={{display:"flex", justifyContent:"space-between"}}>
+                          <span style={{color:"#ff44cc", fontWeight:"bold"}}>Account: {b.account}</span>
+                          <span style={{background: b.severity==="CRITICAL"?"#ff0000":"#ff4500", color:"white", padding:"2px 8px", borderRadius:"4px", fontSize:"0.75em"}}>{b.severity}</span>
+                        </div>
+                        <div style={{color:"#888", fontSize:"0.85em", marginTop:"6px"}}>
+                          Senders: {b.unique_senders} | Receivers: {b.unique_receivers} | Forwarding: {(b.forwarding_ratio*100).toFixed(0)}%
+                        </div>
+                        <div style={{color:"#888", fontSize:"0.85em"}}>
+                          Inflow: ₹{(b.total_inflow/100000).toFixed(1)}L | Outflow: ₹{(b.total_outflow/100000).toFixed(1)}L
+                        </div>
+                        <div style={{color:"#ff44cc", fontSize:"0.8em", marginTop:"4px"}}>{b.threat}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{background:"#0a1a1a", border:"1px solid #00ccff", borderRadius:"8px", padding:"20px"}}>
+                  <h3 style={{color:"#44ddff", marginBottom:"15px"}}>🏢 Shell Company Detection</h3>
+                  <p style={{color:"#666", marginBottom:"15px"}}>{intelData.shell_company_detection?.analysis}</p>
+                  <div style={{display:"flex", flexDirection:"column", gap:"8px"}}>
+                    {intelData.shell_company_detection?.shells?.map((s, i) => (
+                      <div key={i} style={{background:"#111", border:"1px solid #006688", borderRadius:"6px", padding:"12px"}}>
+                        <div style={{display:"flex", justifyContent:"space-between"}}>
+                          <span style={{color:"#44ddff", fontWeight:"bold"}}>Account: {s.account}</span>
+                          <span style={{background: s.severity==="HIGH"?"#ff4500":"#ffa500", color:"white", padding:"2px 8px", borderRadius:"4px", fontSize:"0.75em"}}>{s.severity}</span>
+                        </div>
+                        <div style={{color:"#888", fontSize:"0.85em", marginTop:"6px"}}>
+                          Transactions: {s.transaction_count} | Round Amount Ratio: {s.round_amount_ratio}% | Senders: {s.unique_senders}
+                        </div>
+                        <div style={{color:"#888", fontSize:"0.85em"}}>
+                          Total Received: ₹{(s.total_received/100000).toFixed(1)}L
+                        </div>
+                        <div style={{color:"#44ddff", fontSize:"0.8em", marginTop:"4px"}}>{s.threat}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+
+                <div style={{background:"#1a0a1a", border:"1px solid #ff00aa", borderRadius:"8px", padding:"20px"}}>
+                  <h3 style={{color:"#ff44cc", marginBottom:"15px"}}>🏦 Hawala Broker Detection</h3>
+                  <p style={{color:"#666", marginBottom:"15px"}}>{intelData.hawala_detection?.analysis}</p>
+                  <div style={{display:"flex", flexDirection:"column", gap:"8px"}}>
+                    {intelData.hawala_detection?.brokers?.map((b, i) => (
+                      <div key={i} style={{background:"#111", border:"1px solid #880055", borderRadius:"6px", padding:"12px"}}>
+                        <div style={{display:"flex", justifyContent:"space-between"}}>
+                          <span style={{color:"#ff44cc", fontWeight:"bold"}}>Account: {b.account}</span>
+                          <span style={{background:b.severity==="CRITICAL"?"#ff0000":"#ff4500", color:"white", padding:"2px 8px", borderRadius:"4px", fontSize:"0.75em"}}>{b.severity}</span>
+                        </div>
+                        <div style={{color:"#888", fontSize:"0.85em", marginTop:"6px"}}>
+                          Senders: {b.unique_senders} | Receivers: {b.unique_receivers} | Forwarding: {(b.forwarding_ratio*100).toFixed(0)}%
+                        </div>
+                        <div style={{color:"#888", fontSize:"0.85em"}}>Inflow: ₹{(b.total_inflow/100000).toFixed(1)}L | Outflow: ₹{(b.total_outflow/100000).toFixed(1)}L</div>
+                        <div style={{color:"#ff44cc", fontSize:"0.8em", marginTop:"4px"}}>{b.threat}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{background:"#0a1a1a", border:"1px solid #00ccff", borderRadius:"8px", padding:"20px"}}>
+                  <h3 style={{color:"#44ddff", marginBottom:"15px"}}>🏢 Shell Company Detection</h3>
+                  <p style={{color:"#666", marginBottom:"15px"}}>{intelData.shell_company_detection?.analysis}</p>
+                  <div style={{display:"flex", flexDirection:"column", gap:"8px"}}>
+                    {intelData.shell_company_detection?.shells?.map((s, i) => (
+                      <div key={i} style={{background:"#111", border:"1px solid #006688", borderRadius:"6px", padding:"12px"}}>
+                        <div style={{display:"flex", justifyContent:"space-between"}}>
+                          <span style={{color:"#44ddff", fontWeight:"bold"}}>Account: {s.account}</span>
+                          <span style={{background:s.severity==="HIGH"?"#ff4500":"#ffa500", color:"white", padding:"2px 8px", borderRadius:"4px", fontSize:"0.75em"}}>{s.severity}</span>
+                        </div>
+                        <div style={{color:"#888", fontSize:"0.85em", marginTop:"6px"}}>
+                          Transactions: {s.transaction_count} | Round Amount Ratio: {s.round_amount_ratio}% | Senders: {s.unique_senders}
+                        </div>
+                        <div style={{color:"#888", fontSize:"0.85em"}}>Total Received: ₹{(s.total_received/100000).toFixed(1)}L</div>
+                        <div style={{color:"#44ddff", fontSize:"0.8em", marginTop:"4px"}}>{s.threat}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* TEMPORAL TAB */}
+        {activeTab === "temporal" && (
+          <div style={{flex:1, overflowY:"auto", padding:"20px"}}>
+            <h2 style={{color:"#00ff88", marginBottom:"20px"}}>⏱ Temporal Analysis — Lifecycle Patterns</h2>
+            <p style={{color:"#888", marginBottom:"20px"}}>Detects dormant reactivation, delayed layering, velocity spikes, smurfing sequences, rapid forwarding</p>
+            {temporalLoading && <div className="loading">Running temporal analysis...</div>}
+            {temporalData && (
+              <>
+                <div style={{background:"#111", border:"1px solid #333", borderRadius:"8px", padding:"15px", marginBottom:"20px"}}>
+                  <span style={{color:"#00ff88", fontWeight:"bold", fontSize:"1.2em"}}>{temporalData.total_flagged} accounts</span>
+                  <span style={{color:"#888"}}> flagged with temporal patterns</span>
+                </div>
+                <div style={{display:"flex", flexDirection:"column", gap:"12px"}}>
+                  {temporalData.results.map(r => (
+                    <div key={r.account_id} style={{background:"#0a0a1a", border:"1px solid #0044ff", borderRadius:"8px", padding:"15px"}}>
+                      <div style={{display:"flex", justifyContent:"space-between", marginBottom:"10px"}}>
+                        <span style={{color:"#4488ff", fontWeight:"bold", fontSize:"1.1em"}}>{r.account_id}</span>
+                        <span style={{background:getRiskColor(r.temporal_risk_level), color:"black", padding:"2px 8px", borderRadius:"4px", fontSize:"0.75em", fontWeight:"bold"}}>{r.temporal_risk_level}</span>
+                      </div>
+                      {r.patterns_detected.map((p, i) => (
+                        <div key={i} style={{background:"#111", border:`1px solid ${p.severity==="CRITICAL"?"#ff0000":p.severity==="HIGH"?"#ff4500":"#ffa500"}`, borderRadius:"6px", padding:"10px", marginBottom:"8px"}}>
+                          <div style={{color:p.severity==="CRITICAL"?"#ff4444":p.severity==="HIGH"?"#ff8800":"#ffaa00", fontWeight:"bold", fontSize:"0.85em"}}>{p.pattern}</div>
+                          <div style={{color:"#ccc", fontSize:"0.82em", marginTop:"4px"}}>{p.description}</div>
+                          <div style={{color:"#888", fontSize:"0.78em", marginTop:"4px", fontStyle:"italic"}}>{p.alert}</div>
+                        </div>
+                      ))}
+                      <div style={{marginTop:"10px"}}>
+                        <div style={{color:"#555", fontSize:"0.75em", marginBottom:"4px"}}>TIMELINE</div>
+                        <div style={{display:"flex", gap:"6px", flexWrap:"wrap"}}>
+                          {r.timeline_summary.map((t, i) => (
+                            <span key={i} style={{background:t.type==="INCOMING"?"#001a08":"#1a0000", border:`1px solid ${t.type==="INCOMING"?"#00aa44":"#aa0000"}`, color:t.type==="INCOMING"?"#00ff88":"#ff4444", padding:"3px 8px", borderRadius:"4px", fontSize:"0.72em"}}>
+                              {t.direction} ₹{(t.amount/1000).toFixed(0)}K {t.time.slice(5,16)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         )}
@@ -399,7 +527,6 @@ function App() {
             {evidenceData && (
               <div style={{display:"flex", flexDirection:"column", gap:"20px"}}>
 
-                {/* Header */}
                 <div style={{background:"#111", border:"1px solid #333", borderRadius:"8px", padding:"20px"}}>
                   <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
                     <div>
@@ -410,7 +537,6 @@ function App() {
                   </div>
                 </div>
 
-                {/* Account Summary */}
                 <div style={{background: getRiskBg(evidenceData.account_summary?.risk_level), border:`2px solid ${getRiskColor(evidenceData.account_summary?.risk_level)}`, borderRadius:"8px", padding:"20px"}}>
                   <h3 style={{color: getRiskColor(evidenceData.account_summary?.risk_level), marginBottom:"15px"}}>Account: {evidenceData.account_summary?.account_id}</h3>
                   <div style={{display:"flex", gap:"20px", flexWrap:"wrap"}}>
@@ -424,7 +550,6 @@ function App() {
                   </div>
                 </div>
 
-                {/* ML Analysis */}
                 <div style={{background:"#0a0a1a", border:"1px solid #0044ff", borderRadius:"8px", padding:"20px"}}>
                   <h3 style={{color:"#4488ff", marginBottom:"15px"}}>🤖 ML Analysis</h3>
                   <div style={{color:"#888", fontSize:"0.85em", marginBottom:"10px"}}>{evidenceData.ml_analysis?.detection_method}</div>
@@ -438,7 +563,6 @@ function App() {
                   </div>
                 </div>
 
-                {/* Regulatory Output */}
                 <div style={{background:"#0a1a0a", border:"1px solid #00aa44", borderRadius:"8px", padding:"20px"}}>
                   <h3 style={{color:"#00ff88", marginBottom:"15px"}}>⚖ Regulatory Output</h3>
                   <div style={{display:"flex", gap:"10px", marginBottom:"15px", flexWrap:"wrap"}}>
@@ -458,7 +582,6 @@ function App() {
                   ))}
                 </div>
 
-                {/* FIR Summary */}
                 <div style={{background:"#111", border:"1px solid #555", borderRadius:"8px", padding:"20px"}}>
                   <h3 style={{color:"#fff", marginBottom:"15px"}}>📄 FIR Summary — Court Ready</h3>
                   <pre style={{color:"#ccc", fontSize:"0.82em", whiteSpace:"pre-wrap", fontFamily:"monospace", lineHeight:"1.6"}}>

@@ -267,3 +267,28 @@ def generate_evidence(account_id: str):
 def get_response(risk_score: float):
     """Get graduated response recommendation for a risk score"""
     return response_engine.get_graduated_response(risk_score)
+
+# ── V2.0 LSTM TEMPORAL ENDPOINTS ────────────────────────────────────
+
+from lstm_temporal import lstm_detector
+
+@app.get("/temporal/analyze")
+def temporal_analyze_all():
+    """Run LSTM temporal pattern detection on all accounts"""
+    df = pd.read_csv("transactions.csv")
+    results = lstm_detector.analyze_all_accounts(df)
+    return {
+        "system": "TraceNetX v2.0 — Temporal Analysis",
+        "total_flagged": len(results),
+        "patterns": ["DORMANT_REACTIVATION", "DELAYED_LAYERING", "VELOCITY_SPIKE", "SMURFING_SEQUENCE", "RAPID_FORWARD"],
+        "results": results
+    }
+
+@app.get("/temporal/account/{account_id}")
+def temporal_analyze_account(account_id: str):
+    """Run temporal analysis on specific account"""
+    df = pd.read_csv("transactions.csv")
+    result = lstm_detector.analyze_account_timeline(account_id, df)
+    if not result:
+        return {"error": f"No temporal data found for {account_id}"}
+    return result

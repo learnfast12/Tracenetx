@@ -27,6 +27,25 @@ def init_db():
                  city=row["sender_city"], case_id=row["case_id"])
 
 def get_graph_data(case_id=None):
+    from ml_pipeline import ml_pipeline
+    import pandas as pd
+
+    df = pd.read_csv("transactions.csv")
+
+    # Get ML scores if trained
+    ml_results = {}
+    if ml_pipeline.is_trained:
+        results = ml_pipeline.predict(df)
+        for r in results:
+            ml_results[r['account_id']] = {
+                "score": r['risk_score'],
+                "level": r['risk_level'],
+                "flags": r['flags'],
+                "mule_type": r['mule_type'],
+                "shap_explanation": r['shap_explanation'],
+                "recommended_action": r['recommended_action']
+            }
+
     with driver.session() as session:
         if case_id:
             result = session.run("""
@@ -40,18 +59,30 @@ def get_graph_data(case_id=None):
                 RETURN s.id as source, r.id as target,
                        t.amount as amount, t.sender_ip as ip, t.sender_city as city
             """)
+
         nodes = set()
         edges = []
         for record in result:
             nodes.add(record["source"])
             nodes.add(record["target"])
-            edges.append({"source": record["source"], "target": record["target"],
-                          "amount": record["amount"], "ip": record["ip"], "city": record["city"]})
+            edges.append({
+                "source": record["source"],
+                "target": record["target"],
+                "amount": record["amount"],
+                "ip": record["ip"],
+                "city": record["city"]
+            })
+
         from risk import calculate_risk
-        return {
-            "nodes": [{"id": n, "risk": calculate_risk(n)} for n in nodes],
-            "edges": edges
-        }
+        node_list = []
+        for n in nodes:
+            if n in ml_results:
+                risk = ml_results[n]
+            else:
+                risk = calculate_risk(n)
+            node_list.append({"id": n, "risk": risk})
+
+        return {"nodes": node_list, "edges": edges}
 
 def get_account_details(account_id: str):
     with driver.session() as session:

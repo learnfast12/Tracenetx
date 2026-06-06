@@ -1,9 +1,27 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 
 const riskColor = (level) => {
-  if (level === "HIGH") return "#E74C3C";
-  if (level === "MEDIUM") return "#F39C12";
+  if (level === "CRITICAL") return "#FF0000";
+  if (level === "HIGH") return "#FF4500";
+  if (level === "MEDIUM") return "#FFA500";
+  if (level === "LOW") return "#FFD700";
+  if (level === "CLEAR") return "#00CC44";
   return "#27AE60";
+};
+
+const riskSize = (level) => {
+  if (level === "CRITICAL") return 38;
+  if (level === "HIGH") return 34;
+  if (level === "MEDIUM") return 29;
+  if (level === "LOW") return 25;
+  return 22;
+};
+
+const riskGlow = (level) => {
+  if (level === "CRITICAL") return "rgba(255,0,0,0.5)";
+  if (level === "HIGH") return "rgba(255,69,0,0.35)";
+  if (level === "MEDIUM") return "rgba(255,165,0,0.25)";
+  return null;
 };
 
 function SpiderMap({ graphData, onNodeClick }) {
@@ -45,8 +63,6 @@ function SpiderMap({ graphData, onNodeClick }) {
     state.particles = [];
 
     const edges = graphData.edges;
-
-    // init particles on edges
     edges.forEach((e, ei) => {
       for (let p = 0; p < 2; p++) {
         state.particles.push({
@@ -94,7 +110,7 @@ function SpiderMap({ graphData, onNodeClick }) {
     function draw() {
       ctx.clearRect(0, 0, W, H);
 
-      // dot grid
+      // dot grid background
       ctx.fillStyle = "rgba(255,255,255,0.04)";
       for (let x = 30; x < W; x += 40)
         for (let y = 30; y < H; y += 40) {
@@ -107,21 +123,28 @@ function SpiderMap({ graphData, onNodeClick }) {
       edges.forEach((e, ei) => {
         const s = positions[e.source], t = positions[e.target];
         if (!s || !t) return;
-        const isHigh = s.node.risk?.level==="HIGH" || t.node.risk?.level==="HIGH";
+        const sLevel = s.node.risk?.level;
+        const tLevel = t.node.risk?.level;
+        const isCritical = sLevel==="CRITICAL" || tLevel==="CRITICAL";
+        const isHigh = sLevel==="HIGH" || tLevel==="HIGH";
         const isSelected = state.selectedId === e.source || state.selectedId === e.target;
+
+        const edgeColor = isCritical
+          ? (isSelected ? "rgba(255,0,0,0.9)" : "rgba(255,0,0,0.4)")
+          : isHigh
+          ? (isSelected ? "rgba(255,69,0,0.9)" : "rgba(255,69,0,0.35)")
+          : (isSelected ? "rgba(88,166,255,0.8)" : "rgba(88,166,255,0.15)");
 
         ctx.beginPath();
         ctx.moveTo(s.x, s.y);
         ctx.lineTo(t.x, t.y);
-        ctx.strokeStyle = isSelected
-          ? (isHigh ? "rgba(231,76,60,0.9)" : "rgba(88,166,255,0.8)")
-          : (isHigh ? "rgba(231,76,60,0.35)" : "rgba(88,166,255,0.15)");
-        ctx.lineWidth = isSelected ? 2.5 : (isHigh ? 1.8 : 1);
+        ctx.strokeStyle = edgeColor;
+        ctx.lineWidth = isSelected ? 2.5 : (isCritical ? 2.2 : isHigh ? 1.8 : 1);
         ctx.stroke();
 
         // arrowhead
         const angle = Math.atan2(t.y-s.y, t.x-s.x);
-        const rNode = 32;
+        const rNode = riskSize(tLevel);
         const ax = t.x - rNode*Math.cos(angle);
         const ay = t.y - rNode*Math.sin(angle);
         ctx.beginPath();
@@ -129,7 +152,7 @@ function SpiderMap({ graphData, onNodeClick }) {
         ctx.lineTo(ax-9*Math.cos(angle-0.4), ay-9*Math.sin(angle-0.4));
         ctx.lineTo(ax-9*Math.cos(angle+0.4), ay-9*Math.sin(angle+0.4));
         ctx.closePath();
-        ctx.fillStyle = isHigh ? "rgba(231,76,60,0.7)" : "rgba(88,166,255,0.4)";
+        ctx.fillStyle = isCritical ? "rgba(255,0,0,0.8)" : isHigh ? "rgba(255,69,0,0.7)" : "rgba(88,166,255,0.4)";
         ctx.fill();
 
         // amount label
@@ -144,18 +167,21 @@ function SpiderMap({ graphData, onNodeClick }) {
         }
       });
 
-      // moving particles on edges
+      // particles
       state.particles.forEach(p => {
         const e = edges[p.edgeIndex];
         if (!e) return;
         const s = positions[e.source], t = positions[e.target];
         if (!s || !t) return;
-        const isHigh = s.node.risk?.level==="HIGH" || t.node.risk?.level==="HIGH";
+        const sLevel = s.node.risk?.level;
+        const tLevel = t.node.risk?.level;
+        const isCritical = sLevel==="CRITICAL" || tLevel==="CRITICAL";
+        const isHigh = sLevel==="HIGH" || tLevel==="HIGH";
         const px = s.x + (t.x-s.x)*p.progress;
         const py = s.y + (t.y-s.y)*p.progress;
         ctx.beginPath();
-        ctx.arc(px, py, 2.5, 0, 2*Math.PI);
-        ctx.fillStyle = isHigh ? "rgba(231,76,60,0.9)" : "rgba(88,166,255,0.7)";
+        ctx.arc(px, py, isCritical ? 3.5 : 2.5, 0, 2*Math.PI);
+        ctx.fillStyle = isCritical ? "rgba(255,0,0,0.95)" : isHigh ? "rgba(255,69,0,0.9)" : "rgba(88,166,255,0.7)";
         ctx.fill();
         p.progress += p.speed;
         if (p.progress > 1) p.progress = 0;
@@ -164,11 +190,11 @@ function SpiderMap({ graphData, onNodeClick }) {
       // nodes
       Object.values(positions).forEach(p => {
         const n = p.node;
-        const color = riskColor(n.risk?.level);
-        const isHigh = n.risk?.level==="HIGH";
-        const isMed = n.risk?.level==="MEDIUM";
+        const level = n.risk?.level || "CLEAR";
+        const color = riskColor(level);
+        const r = riskSize(level);
+        const glow = riskGlow(level);
         const isSelected = state.selectedId === n.id;
-        const r = isHigh ? 34 : isMed ? 29 : 25;
 
         // selected ring pulse
         if (isSelected) {
@@ -180,13 +206,23 @@ function SpiderMap({ graphData, onNodeClick }) {
           ctx.stroke();
         }
 
-        // glow for high risk
-        if (isHigh) {
+        // critical pulse ring
+        if (level === "CRITICAL") {
+          const pulse = Math.sin(state.pulseFrame * 0.15) * 0.5 + 0.5;
           ctx.beginPath();
-          ctx.arc(p.x, p.y, r+14, 0, 2*Math.PI);
-          const grd = ctx.createRadialGradient(p.x, p.y, r, p.x, p.y, r+14);
-          grd.addColorStop(0, "rgba(231,76,60,0.35)");
-          grd.addColorStop(1, "rgba(231,76,60,0)");
+          ctx.arc(p.x, p.y, r + 8 + pulse*8, 0, 2*Math.PI);
+          ctx.strokeStyle = `rgba(255,0,0,${0.4 + pulse*0.4})`;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+
+        // glow
+        if (glow) {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, r+16, 0, 2*Math.PI);
+          const grd = ctx.createRadialGradient(p.x, p.y, r, p.x, p.y, r+16);
+          grd.addColorStop(0, glow);
+          grd.addColorStop(1, "rgba(0,0,0,0)");
           ctx.fillStyle = grd;
           ctx.fill();
         }
@@ -196,8 +232,8 @@ function SpiderMap({ graphData, onNodeClick }) {
         ctx.arc(p.x, p.y, r, 0, 2*Math.PI);
         ctx.fillStyle = color + (isSelected ? "ff" : "cc");
         ctx.fill();
-        ctx.strokeStyle = isSelected ? "#fff" : (isHigh ? "#ff5555" : "rgba(255,255,255,0.4)");
-        ctx.lineWidth = isSelected ? 3 : (isHigh ? 2.5 : 1.2);
+        ctx.strokeStyle = isSelected ? "#fff" : color;
+        ctx.lineWidth = isSelected ? 3 : 2;
         ctx.stroke();
 
         // label
@@ -207,11 +243,11 @@ function SpiderMap({ graphData, onNodeClick }) {
         ctx.textBaseline = "middle";
         ctx.fillText(n.id.length > 8 ? n.id.slice(0,7)+"…" : n.id, p.x, p.y);
 
-        // risk label
-        ctx.font = "9px monospace";
-        ctx.fillStyle = isHigh ? "#ff8888" : "#8b949e";
+        // risk label below node
+        ctx.font = "bold 9px monospace";
+        ctx.fillStyle = color;
         ctx.textBaseline = "top";
-        ctx.fillText(n.risk?.level||"LOW", p.x, p.y+r+4);
+        ctx.fillText(level, p.x, p.y+r+4);
       });
 
       state.pulseFrame++;
@@ -233,7 +269,7 @@ function SpiderMap({ graphData, onNodeClick }) {
       for (const id in positions) {
         const p = positions[id];
         const dist = Math.sqrt((mx-p.x)**2 + (my-p.y)**2);
-        if (dist < 40) {
+        if (dist < 45) {
           state.selectedId = id;
           state.pulseFrame = 0;
           onNodeClick(id);

@@ -229,11 +229,101 @@ class GraphIntelligence:
             "batch_recruitment": self.batch_recruitment_detection(),
             "convergence_analysis": self.convergence_analysis(),
             "identity_fusion": self.identity_fusion(),
+            "hawala_detection": self.hawala_broker_detection(),
+            "shell_company_detection": self.shell_company_detection(),
         }
         if account_id:
             report["reverse_chain"] = self.reverse_chain_analysis(account_id)
 
         return report
+
+    def hawala_broker_detection(self):
+        """Detect hawala brokers — receives from many, large cash withdrawals, repeating cycle"""
+        with driver.session() as session:
+            result = session.run("""
+                MATCH (hub:Account)-[t:TRANSFER]->(r:Account)
+                WITH hub, count(DISTINCT r) as unique_receivers, sum(t.amount) as total_out
+                MATCH (s:Account)-[t2:TRANSFER]->(hub)
+                WITH hub, unique_receivers, total_out, count(DISTINCT s) as unique_senders, sum(t2.amount) as total_in
+                WHERE unique_senders >= 2 AND unique_receivers >= 2
+                RETURN hub.id as account,
+                       unique_senders,
+                       unique_receivers,
+                       total_in,
+                       total_out
+                ORDER BY unique_senders DESC
+                LIMIT 10
+            """)
+
+            brokers = []
+            for record in result:
+                total_in = record["total_in"] or 0
+                total_out = record["total_out"] or 0
+                ratio = total_out / (total_in + 1)
+
+                if ratio >= 0.7:
+                    brokers.append({
+                        "account": record["account"],
+                        "unique_senders": record["unique_senders"],
+                        "unique_receivers": record["unique_receivers"],
+                        "total_inflow": int(total_in),
+                        "total_outflow": int(total_out),
+                        "forwarding_ratio": round(ratio, 2),
+                        "threat": "HAWALA BROKER SIGNATURE — receives from many, forwards most, repeating cycle",
+                        "severity": "CRITICAL" if record["unique_senders"] >= 4 else "HIGH"
+                    })
+
+            return {
+                "hawala_brokers_detected": len(brokers),
+                "brokers": brokers,
+                "analysis": f"Detected {len(brokers)} potential hawala broker accounts"
+            }
+
+    def shell_company_detection(self):
+        """Detect shell companies — round amounts, burst pattern, no legitimate business flow"""
+        with driver.session() as session:
+            result = session.run("""
+                MATCH (s:Account)-[t:TRANSFER]->(r:Account)
+                WITH r,
+                     collect(t.amount) as amounts,
+                     count(t) as txn_count,
+                     sum(t.amount) as total_received,
+                     collect(DISTINCT s.id) as senders
+                WHERE txn_count >= 2
+                RETURN r.id as account,
+                       amounts,
+                       txn_count,
+                       total_received,
+                       senders
+            """)
+
+            shells = []
+            for record in result:
+                amounts = record["amounts"] or []
+                if not amounts:
+                    continue
+                round_count = sum(1 for a in amounts if a % 10000 == 0)
+                round_ratio = round_count / len(amounts)
+                sender_concentration = len(record["senders"])
+
+                if round_ratio >= 0.6 and record["txn_count"] >= 2:
+                    shells.append({
+                        "account": record["account"],
+                        "transaction_count": record["txn_count"],
+                        "total_received": int(record["total_received"]),
+                        "round_amount_ratio": round(round_ratio * 100, 1),
+                        "unique_senders": sender_concentration,
+                        "amounts": [int(a) for a in amounts],
+                        "threat": "SHELL COMPANY PATTERN — round amounts, burst receipts, no outward commercial flow",
+                        "severity": "HIGH" if round_ratio >= 0.8 else "MEDIUM"
+                    })
+
+            return {
+                "shell_companies_detected": len(shells),
+                "shells": shells,
+                "analysis": f"Detected {len(shells)} potential shell company accounts"
+            }
+
 
 # Global instance
 graph_intel = GraphIntelligence()
