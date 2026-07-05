@@ -3,15 +3,18 @@ import React from "react";
 const fmt = (v) => "₹" + (v >= 100000 ? (v/100000).toFixed(1) + "L" : (v/1000).toFixed(0) + "K");
 
 const riskColor = (level) => {
-  if (level === "HIGH") return "#e74c3c";
-  if (level === "MEDIUM") return "#f39c12";
-  return "#27ae60";
+  if (level === "CRITICAL") return "#FF0000";
+  if (level === "HIGH") return "#FF4500";
+  if (level === "MEDIUM") return "#FFA500";
+  if (level === "CLEAR") return "#00CC44";
+  return "#00CC44";
 };
 
 const riskBg = (level) => {
-  if (level === "HIGH") return "rgba(231,76,60,0.1)";
-  if (level === "MEDIUM") return "rgba(243,156,18,0.1)";
-  return "rgba(39,174,96,0.1)";
+  if (level === "CRITICAL") return "rgba(255,0,0,0.1)";
+  if (level === "HIGH") return "rgba(255,69,0,0.1)";
+  if (level === "MEDIUM") return "rgba(255,165,0,0.1)";
+  return "rgba(0,204,68,0.1)";
 };
 
 function Sidebar({ selectedNode }) {
@@ -55,7 +58,7 @@ function Sidebar({ selectedNode }) {
         textAlign: "center"
       }}>
         <div style={{ color: riskColor(level), fontSize: 11, fontWeight: "bold", letterSpacing: 1, marginBottom: 8 }}>
-          {level === "HIGH" ? "🚨" : level === "MEDIUM" ? "⚠️" : "✅"} {level} RISK
+          {level === "CRITICAL" ? "🚨" : level === "HIGH" ? "🔴" : level === "MEDIUM" ? "⚠️" : "✅"} {level === "CLEAR" ? "SAFE" : level + " RISK"}
         </div>
         <div style={{ color: "#e6edf3", fontSize: 22, fontWeight: "bold", marginBottom: 8 }}>
           {account?.id}
@@ -99,6 +102,14 @@ function Sidebar({ selectedNode }) {
           </div>
         </div>
       </div>
+
+      {/* Own IP */}
+      {account?.own_ip && (
+        <div style={{ marginBottom: 16, background:"#0d1117", border:"1px solid #58a6ff", borderRadius:8, padding:"10px 14px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <span style={{ color:"#8b949e", fontSize:11, fontWeight:"bold" }}>DEVICE IP</span>
+          <span style={{ color:"#58a6ff", fontSize:13, fontFamily:"monospace", fontWeight:"bold" }}>🌐 {account.own_ip}</span>
+        </div>
+      )}
 
       {/* Flags */}
       {flags.length > 0 && (

@@ -1,19 +1,43 @@
 import React, { useEffect, useState } from "react";
 
+const alertColor = (level) => {
+  if (level === "CRITICAL") return "#FF0000";
+  if (level === "HIGH") return "#FF4500";
+  return "#FFA500";
+};
+
+const alertBg = (level) => {
+  if (level === "CRITICAL") return "linear-gradient(135deg, #2a0000, #3a0808)";
+  if (level === "HIGH") return "linear-gradient(135deg, #1a0800, #2a1008)";
+  return "linear-gradient(135deg, #1a1000, #2a1808)";
+};
+
+const alertEmoji = (level) => {
+  if (level === "CRITICAL") return "🚨";
+  if (level === "HIGH") return "🔴";
+  return "⚠️";
+};
+
+const alertShadow = (level) => {
+  if (level === "CRITICAL") return "0 4px 24px rgba(255,0,0,0.4)";
+  if (level === "HIGH") return "0 4px 24px rgba(255,69,0,0.3)";
+  return "0 4px 24px rgba(255,165,0,0.2)";
+};
+
 function AlertSystem() {
   const [alerts, setAlerts] = useState([]);
   const [dismissed, setDismissed] = useState([]);
   const [visible, setVisible] = useState([]);
 
   useEffect(() => {
-    fetch("http://localhost:8000/alerts")
+    fetch("http://localhost:8001/alerts")
       .then(r => r.json())
       .then(data => {
-        const top = data.alerts.slice(0, 3);
+        const top = (data.alerts || []).slice(0, 4);
         setAlerts(top);
         top.forEach((_, i) => {
           setTimeout(() => setVisible(v => [...v, i]), i * 600 + 500);
-          setTimeout(() => setDismissed(d => [...d, i]), i * 600 + 5000);
+          setTimeout(() => setDismissed(d => [...d, i]), i * 600 + 6000);
         });
       });
   }, []);
@@ -29,20 +53,20 @@ function AlertSystem() {
     }}>
       {active.map((alert, i) => (
         <div key={i} style={{
-          background: "linear-gradient(135deg, #1a0000, #2a0808)",
-          border: "1px solid #e74c3c",
-          borderLeft: "4px solid #e74c3c",
+          background: alertBg(alert.level),
+          border: `1px solid ${alertColor(alert.level)}`,
+          borderLeft: `4px solid ${alertColor(alert.level)}`,
           borderRadius: 10,
           padding: "12px 14px",
           animation: "slideIn 0.4s ease",
-          boxShadow: "0 4px 24px rgba(231,76,60,0.3)",
+          boxShadow: alertShadow(alert.level),
           display: "flex", justifyContent: "space-between", alignItems: "flex-start"
         }}>
           <div style={{ flex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-              <span style={{ fontSize: 14 }}>🚨</span>
-              <span style={{ color: "#e74c3c", fontSize: 11, fontWeight: "bold", letterSpacing: 1 }}>
-                HIGH RISK DETECTED
+              <span style={{ fontSize: 14 }}>{alertEmoji(alert.level)}</span>
+              <span style={{ color: alertColor(alert.level), fontSize: 11, fontWeight: "bold", letterSpacing: 1 }}>
+                {alert.level} RISK DETECTED
               </span>
             </div>
             <div style={{ color: "#fff", fontSize: 15, fontWeight: "bold", marginBottom: 4 }}>
@@ -50,7 +74,7 @@ function AlertSystem() {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
               <div style={{
-                background: "#e74c3c",
+                background: alertColor(alert.level),
                 borderRadius: 20, padding: "2px 8px",
                 color: "#fff", fontSize: 11, fontWeight: "bold"
               }}>

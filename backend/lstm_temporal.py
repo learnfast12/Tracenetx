@@ -106,7 +106,7 @@ class LSTMTemporalDetector:
         for _, in_row in incoming.iterrows():
             for _, out_row in outgoing.iterrows():
                 delay = (out_row['timestamp'] - in_row['timestamp']).total_seconds() / 3600
-                if 24 <= delay <= 336:  # 1 day to 2 weeks delay
+                if 1 <= delay <= 336:  # 1 hour to 2 weeks delay
                     amount_ratio = out_row['amount'] / (in_row['amount'] + 1)
                     if 0.7 <= amount_ratio <= 1.0:  # forwards most of what it received
                         return {
@@ -184,11 +184,11 @@ class LSTMTemporalDetector:
         for _, in_row in incoming.iterrows():
             for _, out_row in outgoing.iterrows():
                 delay = (out_row['timestamp'] - in_row['timestamp']).total_seconds() / 3600
-                if 0 < delay <= 2:  # forwarded within 2 hours
+                if 0 < delay <= 6:  # forwarded within 6 hours
                     return {
                         "pattern": "RAPID_FORWARD",
                         "severity": "CRITICAL",
-                        "description": f"Received ₹{int(in_row['amount'])} and forwarded ₹{int(out_row['amount'])} within {delay:.1f} hours",
+                        "description": f"Received ₹{int(in_row['amount'])} and forwarded ₹{int(out_row['amount'])} within {delay:.1f} hours (same-day layering)",
                         "forward_delay_hours": round(delay, 1),
                         "alert": "Instant forwarding — account used purely as pass-through mule"
                     }

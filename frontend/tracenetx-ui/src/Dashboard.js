@@ -3,7 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, L
 
 const fmt = (v) => "₹" + (v >= 100000 ? (v/100000).toFixed(1) + "L" : (v/1000).toFixed(0) + "K");
 
-const COLORS = { HIGH: "#e74c3c", MEDIUM: "#f39c12", LOW: "#27ae60" };
+const COLORS = { CRITICAL: "#FF0000", HIGH: "#FF4500", MEDIUM: "#FFA500", LOW: "#00CC44", CLEAR: "#00CC44" };
 const CITY_COLORS = ["#e74c3c","#f39c12","#27ae60","#58a6ff","#9b59b6","#1abc9c","#e67e22","#2ecc71"];
 
 const CustomTooltip = ({ active, payload, label }) => {
@@ -40,7 +40,7 @@ function Dashboard() {
   const [data, setData] = useState(null);
 
   useEffect(() => {
-    fetch("http://localhost:8000/dashboard")
+    fetch("http://localhost:8001/dashboard")
       .then(r => r.json())
       .then(setData);
   }, []);
@@ -53,9 +53,10 @@ function Dashboard() {
   );
 
   const riskDist = [
-    { name: "High Risk", value: data.high_risk_count, color: "#e74c3c" },
-    { name: "Medium Risk", value: data.medium_risk_count, color: "#f39c12" },
-    { name: "Low Risk", value: data.risk_data.filter(r => r.level === "LOW").length, color: "#27ae60" },
+    { name: "Critical", value: data.risk_data.filter(r => r.level === "CRITICAL").length, color: "#FF0000" },
+    { name: "High Risk", value: data.risk_data.filter(r => r.level === "HIGH").length, color: "#FF4500" },
+    { name: "Medium Risk", value: data.risk_data.filter(r => r.level === "MEDIUM").length, color: "#FFA500" },
+    { name: "Safe", value: data.risk_data.filter(r => r.level === "CLEAR").length, color: "#00CC44" },
   ];
 
   return (
@@ -73,15 +74,16 @@ function Dashboard() {
       <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
         <StatCard label="Total Amount" value={fmt(data.total_amount)} color="#58a6ff" icon="💰" />
         <StatCard label="Transactions" value={data.total_transactions} color="#e6edf3" icon="🔄" />
-        <StatCard label="High Risk" value={data.high_risk_count} color="#e74c3c" icon="🚨" />
-        <StatCard label="Medium Risk" value={data.medium_risk_count} color="#f39c12" icon="⚠️" />
+        <StatCard label="Critical" value={data.risk_data?.filter(r => r.level === "CRITICAL").length || 0} color="#FF0000" icon="🚨" />
+        <StatCard label="High Risk" value={data.risk_data?.filter(r => r.level === "HIGH").length || 0} color="#FF4500" icon="🔴" />
+        <StatCard label="Medium Risk" value={data.risk_data?.filter(r => r.level === "MEDIUM").length || 0} color="#FFA500" icon="⚠️" />
       </div>
 
       {/* Bar Chart — full width */}
       <div style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 12, padding: "20px 24px", marginBottom: 20 }}>
         <div style={{ marginBottom: 16 }}>
           <div style={{ color: "#e6edf3", fontSize: 14, fontWeight: "bold" }}>Account Risk Scores</div>
-          <div style={{ color: "#8b949e", fontSize: 11, marginTop: 2 }}>Ranked by suspicion level — red = HIGH, orange = MEDIUM</div>
+          <div style={{ color: "#8b949e", fontSize: 11, marginTop: 2 }}>Ranked by suspicion level — red = CRITICAL, orange = HIGH, yellow = MEDIUM, green = SAFE</div>
         </div>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={data.risk_data} barCategoryGap="30%">

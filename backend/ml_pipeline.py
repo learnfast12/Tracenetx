@@ -103,8 +103,16 @@ class TraceNetXMLPipeline:
         # If no labels provided, generate synthetic ones for demo
         if labels is None:
             # Use rule-based labels for demo training
-            y = ((feature_df['forwarding_ratio'] > 0.8) &
-                 (feature_df['num_outgoing'] >= 2)).astype(int)
+            y = (
+                # Criminal/mule pattern — full forwarding
+                ((feature_df['forwarding_ratio'] > 0.8) & (feature_df['num_outgoing'] >= 2)) |
+                # Hawala pattern — receives from many, sends to many
+                ((feature_df['unique_senders'] >= 2) & (feature_df['unique_receivers'] >= 2) & (feature_df['forwarding_ratio'] > 0.6)) |
+                # Recruiter pattern — receives from high-risk, forwards small amounts
+                ((feature_df['num_incoming'] >= 1) & (feature_df['num_outgoing'] >= 2) & (feature_df['forwarding_ratio'] > 0.5)) |
+                # IP concentration — multiple senders same IP
+                (feature_df['ip_concentration'] == 1)
+            ).astype(int)
         else:
             y = labels
 
@@ -118,9 +126,14 @@ class TraceNetXMLPipeline:
         except:
             X_res, y_res = X_scaled, y
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X_res, y_res, test_size=0.2, random_state=42, stratify=y_res
-        )
+        try:
+            X_train, X_test, y_train, y_test = train_test_split(
+                X_res, y_res, test_size=0.2, random_state=42, stratify=y_res
+            )
+        except ValueError:
+            X_train, X_test, y_train, y_test = train_test_split(
+                X_res, y_res, test_size=0.2, random_state=42
+            )
 
         # XGBoost
         print("[TraceNetX ML] Training XGBoost...")
@@ -222,10 +235,10 @@ class TraceNetXMLPipeline:
 
     def classify_risk(self, score, features):
         # Graduated 5-level response system
-        if score >= 80:
+        if score >= 70:
             level = "CRITICAL"
             action = "Immediate freeze + STR filing + ED/CBI referral"
-        elif score >= 65:
+        elif score >= 55:
             level = "HIGH"
             action = "Account freeze + investigation + police referral"
         elif score >= 50:

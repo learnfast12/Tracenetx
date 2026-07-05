@@ -10,7 +10,7 @@ function PathFinder({ nodes }) {
     if (!source || !target) return;
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:8000/path?source=${source}&target=${target}`);
+      const res = await fetch(`http://localhost:8001/path?source=${source}&target=${target}`);
       const data = await res.json();
       setResult(data);
     } catch (e) { console.error(e); }
