@@ -47,12 +47,17 @@ function PathFinder({ nodes }) {
                     borderLeft: "3px solid #e74c3c",
                     borderRadius: 6,
                     padding: "8px 10px",
-                    fontSize: 12
+                    fontSize: 12,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 4
                   }}>
-                    <span style={{ color: "#58a6ff" }}>{d.from}</span>
-                    <span style={{ color: "#666", margin: "0 6px" }}>→</span>
-                    <span style={{ color: "#58a6ff" }}>{d.to}</span>
-                    <span style={{ color: "#27ae60", marginLeft: 8, fontWeight: "bold" }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center" }}>
+                      <span style={{ color: "#58a6ff" }}>{d.from}</span>
+                      <span style={{ color: "#666", margin: "0 6px" }}>→</span>
+                      <span style={{ color: "#58a6ff" }}>{d.to}</span>
+                    </div>
+                    <span style={{ color: "#27ae60", fontWeight: "bold", alignSelf: "flex-end" }}>
                       ₹{d.amount.toLocaleString()}
                     </span>
                   </div>

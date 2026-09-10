@@ -3,7 +3,13 @@ import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
 
-class LSTMTemporalDetector:
+class TemporalPatternEngine:
+    """
+    Rule-based behavioral sequence detector for mule account lifecycle patterns.
+    Not a trained neural network — deterministic threshold/window logic over
+    each account's transaction timeline (dormant reactivation, delayed
+    layering, velocity spikes, smurfing, rapid forwarding).
+    """
     """
     Temporal pattern detection for mule account lifecycle.
     Detects:
@@ -231,4 +237,4 @@ class LSTMTemporalDetector:
         return results
 
 # Global instance
-lstm_detector = LSTMTemporalDetector()
+lstm_detector = TemporalPatternEngine()

@@ -174,7 +174,7 @@ function SpiderMap({ graphData, onNodeClick, organized = true }) {
       for (let p = 0; p < count; p++) {
         state.particles.push({
           ei, progress: Math.random(),
-          speed: 0.003 + Math.random() * 0.003,
+          speed: 0.0012 + Math.random() * 0.0012,
         });
       }
     });

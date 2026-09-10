@@ -22,12 +22,19 @@ class GraphIntelligence:
 
             chains = []
             for record in result:
+                chain_nodes = record["chain"]
+                # Skip non-simple paths where a node is revisited — a real fund
+                # flow cannot pass through the same account twice in one link
+                # of custody; this is a Cypher variable-length-path artifact,
+                # not a real transaction pattern.
+                if len(chain_nodes) != len(set(chain_nodes)):
+                    continue
                 chains.append({
-                    "chain": record["chain"],
+                    "chain": chain_nodes,
                     "amounts": record["amounts"],
                     "hops": record["hops"],
-                    "entry_point": record["chain"][0],
-                    "exit_point": record["chain"][-1]
+                    "entry_point": chain_nodes[0],
+                    "exit_point": chain_nodes[-1]
                 })
 
             return {
@@ -122,35 +129,41 @@ class GraphIntelligence:
     def batch_recruitment_detection(self):
         """Find accounts opened same time, same location — recruitment batch"""
         with driver.session() as session:
+            # NOTE: TRANSFER relationships only carry sender_ip/sender_city in
+            # this schema — no receiver_ip/receiver_city property exists.
+            # This means an account that only ever appears as a receiver
+            # (never as a sender) won't be scored here. Known limitation.
             result = session.run("""
                 MATCH (s:Account)-[t:TRANSFER]->(r:Account)
-                RETURN s.id as account,
-                       t.sender_city as city,
-                       t.sender_ip as ip,
-                       t.timestamp as timestamp
+                RETURN s.id as account, t.sender_ip as ip, t.sender_city as city
             """)
 
             records = result.data()
             if not records:
-                return {"recruitment_batches": [], "analysis": "No batches detected"}
+                return {"recruitment_batches": [], "total_batches": 0, "analysis": "No batches detected"}
 
             df = pd.DataFrame(records)
+            df = df.dropna(subset=['ip'])
 
-            # Group by city + IP — same location = possible recruitment batch
-            batches = df.groupby(['city', 'ip']).agg(
-                accounts=('account', lambda x: list(set(x))),
-                count=('account', 'nunique')
+            # Group by IP only — an account's IP is a stable identity signal,
+            # its logged city can vary transaction-to-transaction
+            batches = df.groupby('ip').agg(
+                accounts=('account', lambda x: sorted(set(x))),
+                cities=('city', lambda x: sorted(set(x.dropna()))),
             ).reset_index()
+            batches['account_count'] = batches['accounts'].apply(len)
 
             recruitment_batches = []
-            for _, row in batches[batches['count'] >= 2].iterrows():
+            for _, row in batches[batches['account_count'] >= 2].iterrows():
                 recruitment_batches.append({
-                    "city": row['city'],
                     "shared_ip": row['ip'],
+                    "cities_seen": row['cities'],
                     "accounts": row['accounts'],
-                    "account_count": row['count'],
-                    "alert": f"BATCH RECRUITMENT — {row['count']} accounts from same city+IP"
+                    "account_count": row['account_count'],
+                    "alert": f"BATCH RECRUITMENT — {row['account_count']} accounts sharing IP {row['ip']}"
                 })
+
+            recruitment_batches.sort(key=lambda x: x['account_count'], reverse=True)
 
             return {
                 "recruitment_batches": recruitment_batches,
@@ -262,7 +275,12 @@ class GraphIntelligence:
                 total_out = record["total_out"] or 0
                 ratio = total_out / (total_in + 1)
 
-                if record["unique_senders"] >= 2 and ("HAWALA" in record["account"].upper() or ratio >= 0.7):
+                # Behavioral signal only: receives from 3+ independent senders AND
+                # forwards 95%+ of what it took in — near-total pass-through from
+                # many sources is the actual hawala broker signature; a looser
+                # threshold also catches ordinary mules forwarding most of one
+                # inbound payment, which is a different (weaker) signal
+                if record["unique_senders"] >= 3 and ratio >= 0.95:
                     brokers.append({
                         "account": record["account"],
                         "unique_senders": record["unique_senders"],
@@ -307,12 +325,15 @@ class GraphIntelligence:
                 round_ratio = round_count / len(amounts)
                 sender_concentration = len(record["senders"])
 
-                if record["txn_count"] >= 2 and "SHELL" in record["account"].upper():
+                # Behavioral signal only: majority of inbound amounts are suspiciously
+                # round (multiples of 10,000) AND funds arrive from multiple senders in
+                # bursts — the actual shell-company pattern, not a name match
+                if record["txn_count"] >= 2 and round_ratio >= 0.5 and sender_concentration >= 2:
                     shells.append({
                         "account": record["account"],
                         "transaction_count": record["txn_count"],
                         "total_received": int(record["total_received"]),
-                        "round_amount_ratio": round(round_ratio * 100, 1),
+                        "round_amount_percentage": round(round_ratio * 100, 1),
                         "unique_senders": sender_concentration,
                         "amounts": [int(a) for a in amounts],
                         "threat": "SHELL COMPANY PATTERN — round amounts, burst receipts, no outward commercial flow",
