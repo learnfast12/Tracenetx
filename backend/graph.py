@@ -1,8 +1,9 @@
+import os
 from neo4j import GraphDatabase
 import pandas as pd
 
-URI = "bolt://localhost:7687"
-AUTH = ("neo4j", "password123")
+URI = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
+AUTH = (os.environ.get("NEO4J_USER", "neo4j"), os.environ.get("NEO4J_PASSWORD", "password123"))
 driver = GraphDatabase.driver(URI, auth=AUTH)
 
 def init_db(csv_path="transactions.csv"):

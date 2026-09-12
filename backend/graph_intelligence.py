@@ -1,9 +1,10 @@
+import os
 from neo4j import GraphDatabase
 import pandas as pd
 from collections import defaultdict
 
-URI = "bolt://localhost:7687"
-AUTH = ("neo4j", "password123")
+URI = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
+AUTH = (os.environ.get("NEO4J_USER", "neo4j"), os.environ.get("NEO4J_PASSWORD", "password123"))
 driver = GraphDatabase.driver(URI, auth=AUTH)
 
 class GraphIntelligence:
