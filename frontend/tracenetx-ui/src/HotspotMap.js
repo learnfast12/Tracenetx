@@ -38,7 +38,7 @@ export default function HotspotMap({ hotspots: propHotspots }) {
 
   useEffect(() => {
     if (propHotspots) return;
-    fetch("http://localhost:8001/geospatial/hotspots")
+    fetch(`${process.env.REACT_APP_API_URL}/geospatial/hotspots`)
       .then(r => r.json())
       .then(d => setHotspots(d.hotspots || []))
       .catch(() => {});

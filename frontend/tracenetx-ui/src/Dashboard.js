@@ -40,7 +40,7 @@ function Dashboard() {
   const [data, setData] = useState(null);
 
   useEffect(() => {
-    fetch("http://localhost:8001/dashboard")
+    fetch(`${process.env.REACT_APP_API_URL}/dashboard`)
       .then(r => r.json())
       .then(setData);
   }, []);

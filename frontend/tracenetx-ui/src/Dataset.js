@@ -21,7 +21,7 @@ const getRiskColor = (level) => {
   return map[level] || COLORS.textMuted;
 };
 
-const API = "http://localhost:8001";
+const API = `${process.env.REACT_APP_API_URL}`;
 
 function Dataset({ onViewMLAnalysis, onDatasetActivated }) {
   const [datasets, setDatasets] = useState([]);

@@ -101,14 +101,14 @@ function App() {
     setLoading(true);
     try {
       const hasFilter = activeFilters.ip || activeFilters.phone || activeFilters.city;
-      let url = "http://localhost:8001/graph";
+      let url = `${process.env.REACT_APP_API_URL}/graph`;
       const params = new URLSearchParams();
       if (activeFilters.case_id) params.append("case_id", activeFilters.case_id);
       if (hasFilter) {
         if (activeFilters.ip) params.append("ip", activeFilters.ip);
         if (activeFilters.phone) params.append("phone", activeFilters.phone);
         if (activeFilters.city) params.append("city", activeFilters.city);
-        url = "http://localhost:8001/filter";
+        url = `${process.env.REACT_APP_API_URL}/filter`;
       }
       const query = params.toString();
       const res = await fetch(query ? url + "?" + query : url);
@@ -119,7 +119,7 @@ function App() {
   };
 
   const fetchAccount = async (id) => {
-    const res = await fetch("http://localhost:8001/account/" + id);
+    const res = await fetch(`${process.env.REACT_APP_API_URL}/account/` + id);
     const data = await res.json();
     setSelectedNode(data);
   };
@@ -127,7 +127,7 @@ function App() {
   const fetchML = async () => {
     setMlLoading(true);
     try {
-      const res = await fetch("http://localhost:8001/ml/analyze");
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/ml/analyze`);
       const data = await res.json();
       setMlData(data);
     } catch (e) { console.error(e); }
@@ -137,7 +137,7 @@ function App() {
   const fetchIntelligence = async () => {
     setIntelLoading(true);
     try {
-      const res = await fetch("http://localhost:8001/intelligence/full");
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/intelligence/full`);
       const data = await res.json();
       setIntelData(data);
     } catch (e) { console.error(e); }
@@ -147,7 +147,7 @@ function App() {
   const fetchEvidence = async (accountId) => {
     setEvidenceLoading(true);
     try {
-      const res = await fetch("http://localhost:8001/evidence/" + accountId);
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/evidence/` + accountId);
       const data = await res.json();
       setEvidenceData(data);
     } catch (e) { console.error(e); }
@@ -157,7 +157,7 @@ function App() {
   const fetchTemporal = async () => {
     setTemporalLoading(true);
     try {
-      const res = await fetch("http://localhost:8001/temporal/analyze");
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/temporal/analyze`);
       const data = await res.json();
       setTemporalData(data);
     } catch (e) { console.error(e); }
@@ -167,7 +167,7 @@ function App() {
   const fetchValidation = async () => {
     setValidationLoading(true);
     try {
-      const res = await fetch("http://localhost:8001/ml/real-data-validation");
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/ml/real-data-validation`);
       const data = await res.json();
       setValidationData(data);
     } catch (e) { console.error(e); }
@@ -183,7 +183,7 @@ function App() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const res = await fetch("http://localhost:8001/export");
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/export`);
       if (!res.ok) throw new Error(`Export failed: ${res.status}`);
       const csv = await res.text();
       const blob = new Blob([csv], { type: "text/csv" });
@@ -215,7 +215,7 @@ function App() {
     setValidationData(null);
     setGraphData({ nodes: [], edges: [] });
     try {
-      const res = await fetch("http://localhost:8001/dataset/list");
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/dataset/list`);
       const data = await res.json();
       setActiveDatasetId(data.active || "demo");
     } catch (e) { console.error(e); }

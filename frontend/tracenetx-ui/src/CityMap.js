@@ -34,7 +34,7 @@ export default function CityMap({ graphData, onCityClick }) {
   const frameRef = useRef(0);
 
   useEffect(() => {
-    fetch("http://localhost:8001/city/flows")
+    fetch(`${process.env.REACT_APP_API_URL}/city/flows`)
       .then(r => r.json())
       .then(d => {
         setCityFlows(d.city_flows || []);

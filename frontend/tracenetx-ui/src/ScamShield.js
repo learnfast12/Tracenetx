@@ -17,7 +17,7 @@ export default function ScamShield() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch("http://localhost:8001/scam/demo-cases")
+    fetch(`${process.env.REACT_APP_API_URL}/scam/demo-cases`)
       .then(r => r.json())
       .then(d => setDemoCases(d.cases || []))
       .catch(() => {});
@@ -35,7 +35,7 @@ export default function ScamShield() {
     if (!transcript.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8001/scam/analyze", {
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/scam/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

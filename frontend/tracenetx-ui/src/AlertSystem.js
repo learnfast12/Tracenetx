@@ -30,7 +30,7 @@ function AlertSystem() {
   const [visible, setVisible] = useState([]);
 
   useEffect(() => {
-    fetch("http://localhost:8001/alerts")
+    fetch(`${process.env.REACT_APP_API_URL}/alerts`)
       .then(r => r.json())
       .then(data => {
         const top = (data.alerts || []).slice(0, 4);
