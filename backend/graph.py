@@ -5,8 +5,8 @@ URI = "bolt://localhost:7687"
 AUTH = ("neo4j", "password123")
 driver = GraphDatabase.driver(URI, auth=AUTH)
 
-def init_db():
-    df = pd.read_csv("transactions.csv")
+def init_db(csv_path="transactions.csv"):
+    df = pd.read_csv(csv_path)
     with driver.session() as session:
         session.run("MATCH (n) DETACH DELETE n")
         for _, row in df.iterrows():
@@ -30,9 +30,10 @@ def init_db():
 
 def get_graph_data(case_id=None):
     from ml_pipeline import ml_pipeline
+    from dataset_manager import dataset_manager
     import pandas as pd
 
-    df = pd.read_csv("transactions.csv")
+    df = pd.read_csv(dataset_manager.get_active_path())
 
     # Get ML scores if trained
     ml_results = {}
@@ -79,6 +80,9 @@ def get_graph_data(case_id=None):
 
         from risk import calculate_risk
         def override_risk(account_id, risk):
+            from dataset_manager import dataset_manager
+            if dataset_manager.get_active_id() != "demo":
+                return risk
             aid = account_id.upper()
             if 'CRIMINAL' in aid:
                 risk = dict(risk); risk['level'] = 'CRITICAL'; risk['score'] = 92

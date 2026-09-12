@@ -28,6 +28,12 @@ function getTier(node) {
   if (id.includes("HAWALA") || id.includes("SHELL")) return 3;
   if (id.includes("DEALER") || id.includes("COLLECTOR")) return 4;
   if (id.includes("CRYPTO")) return 4;
+  // Fallback for uploaded datasets with no named entity types (e.g. plain
+  // ACC#### ids): spread by actual risk level instead of dumping every
+  // account into one MULE-layer row.
+  const level = node.risk && node.risk.level;
+  if (level === "CRITICAL") return 1;
+  if (level === "HIGH" || level === "MEDIUM") return 3;
   return 2;
 }
 
@@ -68,15 +74,23 @@ function SpiderMap({ graphData, onNodeClick, organized = true }) {
     const TIER_Y = { 0:H*0.08, 1:H*0.26, 2:H*0.50, 3:H*0.72, 4:H*0.90 };
 
     const tierTargets = {};
+    const MIN_NODE_SPACING = 92; // px — below this, labels start overlapping
+    const ROW_HEIGHT = 42;
     [0,1,2,3,4].forEach(ti => {
       const group = tiers[ti];
       if (!group.length) return;
       const pad = 80;
-      const step = (W - pad*2) / Math.max(group.length, 1);
+      const usableWidth = W - pad*2;
+      const maxPerRow = Math.max(1, Math.floor(usableWidth / MIN_NODE_SPACING));
       group.forEach((n, i) => {
+        const row = Math.floor(i / maxPerRow);
+        const rowStart = row * maxPerRow;
+        const countInRow = Math.min(maxPerRow, group.length - rowStart);
+        const col = i - rowStart;
+        const step = usableWidth / Math.max(countInRow, 1);
         tierTargets[n.id] = {
-          x: group.length === 1 ? W/2 : pad + step*i + step/2,
-          y: TIER_Y[ti],
+          x: countInRow === 1 ? W/2 : pad + step*col + step/2,
+          y: TIER_Y[ti] + row*ROW_HEIGHT,
         };
       });
     });
@@ -190,18 +204,28 @@ function SpiderMap({ graphData, onNodeClick, organized = true }) {
           ctx.beginPath(); ctx.arc(x, y, 1, 0, 2*Math.PI); ctx.fill();
         }
 
-      /* tier band labels */
+      /* tier band labels — only claim a named-entity role (CRIMINAL/RECRUITER/etc)
+         when a node in that tier actually matched that naming pattern; otherwise
+         label the band by what it really is: a risk-severity grouping */
+      const namedTier = { 0:false, 1:false, 2:false, 3:false, 4:false };
+      nodes.forEach(n => {
+        const id = n.id.toUpperCase();
+        if (id.includes("CRIMINAL")) namedTier[0] = true;
+        if (id.includes("RECRUITER") || id.includes("RECR")) namedTier[1] = true;
+        if (id.includes("HAWALA") || id.includes("SHELL")) namedTier[3] = true;
+        if (id.includes("DEALER") || id.includes("COLLECTOR") || id.includes("CRYPTO")) namedTier[4] = true;
+      });
       const bands = [
-        { y: TIER_Y[0], label: "CRIMINAL LAYER",      col: "rgba(255,45,45,0.08)"  },
-        { y: TIER_Y[1], label: "RECRUITER LAYER",     col: "rgba(255,107,0,0.06)"  },
-        { y: TIER_Y[2], label: "MULE LAYER",          col: "rgba(0,200,83,0.04)"   },
-        { y: TIER_Y[3], label: "INTERMEDIARY LAYER",  col: "rgba(255,179,0,0.06)"  },
-        { y: TIER_Y[4], label: "COLLECTION / EXIT",   col: "rgba(0,100,255,0.07)"  },
+        { y: TIER_Y[0], label: namedTier[0] ? "CRIMINAL LAYER" : "CRITICAL RISK",        col: "rgba(255,45,45,0.08)"  },
+        { y: TIER_Y[1], label: namedTier[1] ? "RECRUITER LAYER" : "CRITICAL RISK",       col: "rgba(255,107,0,0.06)"  },
+        { y: TIER_Y[2], label: "STANDARD ACCOUNTS",                                      col: "rgba(0,200,83,0.04)"   },
+        { y: TIER_Y[3], label: namedTier[3] ? "INTERMEDIARY LAYER" : "ELEVATED RISK",    col: "rgba(255,179,0,0.06)"  },
+        { y: TIER_Y[4], label: namedTier[4] ? "COLLECTION / EXIT" : "ELEVATED RISK",     col: "rgba(0,100,255,0.07)"  },
       ];
       if (state.lerpT > 0.1) bands.forEach(b => {
         ctx.fillStyle = b.col;
         ctx.fillRect(0, b.y - 52, W, 104);
-        ctx.font = "bold 10px monospace";
+        ctx.font = "bold 10px 'IBM Plex Mono', monospace";
         ctx.fillStyle = "rgba(255,255,255,0.10)";
         ctx.textAlign = "left";
         ctx.globalAlpha = Math.min(state.lerpT, 1);
@@ -263,7 +287,7 @@ function SpiderMap({ graphData, onNodeClick, organized = true }) {
         const midX = 0.25*s.x + 0.5*cx + 0.25*t.x;
         const midY = 0.25*s.y + 0.5*cy + 0.25*t.y - 7;
         if (Math.abs(t.x - s.x) + Math.abs(t.y - s.y) > 60) {
-          ctx.font = "9px monospace";
+          ctx.font = "9px 'IBM Plex Mono', monospace";
           ctx.fillStyle = isSelected ? "#fff" : (isCash ? "rgba(255,220,80,0.7)" : "rgba(150,150,150,0.7)");
           ctx.textAlign = "center";
           ctx.fillText(
@@ -353,7 +377,7 @@ function SpiderMap({ graphData, onNodeClick, organized = true }) {
         /* label inside node */
         const label = shortLabel(n.id);
         const fs = r >= 36 ? 11 : r >= 28 ? 10 : 9;
-        ctx.font = `bold ${fs}px monospace`;
+        ctx.font = `bold ${fs}px 'IBM Plex Mono', monospace`;
         ctx.fillStyle = "#fff";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -361,7 +385,7 @@ function SpiderMap({ graphData, onNodeClick, organized = true }) {
 
         /* risk badge below node — only for non-mule accounts */
         if (!n.id.startsWith('ACC_')) {
-          ctx.font = "bold 8px monospace";
+          ctx.font = "bold 8px 'IBM Plex Mono', monospace";
           ctx.fillStyle = color;
           ctx.textBaseline = "top";
           const badge = level === "CLEAR" ? "SAFE" : level;

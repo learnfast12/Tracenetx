@@ -5,6 +5,7 @@ import AlertSystem from "./AlertSystem";
 import PathFinder from "./PathFinder";
 import Dashboard from "./Dashboard";
 import CityMap from "./CityMap";
+import Dataset from "./Dataset";
 import "./App.css";
 
 const COLORS = {
@@ -77,6 +78,7 @@ const DataRow = ({ label, value, color }) => (
 
 function App() {
   const [graphData, setGraphData] = useState({ nodes: [], edges: [] });
+  const [activeDatasetId, setActiveDatasetId] = useState("demo");
   const [selectedNode, setSelectedNode] = useState(null);
   const [filters, setFilters] = useState({ ip: "", phone: "", city: "", case_id: "" });
   const [loading, setLoading] = useState(true);
@@ -206,6 +208,20 @@ function App() {
     if (tab === "validation" && !validationData) fetchValidation();
   };
 
+  const handleDatasetActivated = async () => {
+    setMlData(null);
+    setIntelData(null);
+    setTemporalData(null);
+    setValidationData(null);
+    setGraphData({ nodes: [], edges: [] });
+    try {
+      const res = await fetch("http://localhost:8001/dataset/list");
+      const data = await res.json();
+      setActiveDatasetId(data.active || "demo");
+    } catch (e) { console.error(e); }
+    fetchGraph();
+  };
+
   useEffect(() => { fetchGraph(); }, []);
 
   const highRiskCount = (graphData.nodes || []).filter(n => n.risk && n.risk.level === "HIGH").length;
@@ -293,6 +309,7 @@ function App() {
             ["intelligence", "🧠 Intelligence"],
             ["temporal", "⏱ Temporal"],
             // ["validation", "🔬 Model Validation"], // hidden post-BOI, re-enable if needed
+            ["dataset", "📁 Dataset"],
             ["dashboard", "📊 Dashboard"],
             ["citymap", "🗺 City Map"],
           ].map(([id, label]) => (
@@ -877,8 +894,9 @@ function App() {
           </div>
         )}
 
+        {activeTab === "dataset" && <Dataset onViewMLAnalysis={() => handleTabSwitch("ml")} onDatasetActivated={handleDatasetActivated} />}
         {activeTab === "dashboard" && <div style={{ flex: 1, overflowY: "auto" }}><Dashboard /></div>}
-        {activeTab === "citymap" && <div style={{ flex: 1 }}><CityMap graphData={graphData} onCityClick={(city) => {
+        {activeTab === "citymap" && <div style={{ flex: 1 }}><CityMap key={activeDatasetId} graphData={graphData} onCityClick={(city) => {
   setActiveTab("map");
   const newFilters = { ip: "", phone: "", city: city, case_id: filters.case_id };
   setFilters(newFilters);

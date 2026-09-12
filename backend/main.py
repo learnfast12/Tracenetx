@@ -1,6 +1,6 @@
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from graph import init_db, get_graph_data, get_account_details
+from graph import init_db, get_graph_data, get_account_details, init_db as reload_graph
 from risk import calculate_risk
 from ml_pipeline import ml_pipeline
 from graph_intelligence import graph_intel
@@ -8,6 +8,7 @@ from response_engine import response_engine
 from real_validation import run_real_validation, run_nested_validation
 from geospatial import router as geospatial_router
 from scam_detection import router as scam_router
+from dataset_manager import dataset_manager
 import pandas as pd
 
 app = FastAPI(
@@ -26,11 +27,48 @@ app.add_middleware(
 app.include_router(geospatial_router)
 app.include_router(scam_router)
 
+# DATASET UPLOAD ENDPOINTS
+@app.post("/dataset/upload")
+async def upload_dataset(file: UploadFile = File(...)):
+    if not file.filename.endswith(".csv"):
+        raise HTTPException(400, "Only CSV files are supported")
+    contents = await file.read()
+    try:
+        entry = dataset_manager.upload(file.filename, contents)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    dataset_manager.activate(entry["id"])
+    active_path = dataset_manager.get_active_path()
+    df = pd.read_csv(active_path)
+    ml_pipeline.train(df)
+    reload_graph(active_path)
+    return {
+        "status": "uploaded",
+        "dataset": entry,
+        "message": f"Dataset '{entry['name']}' uploaded, activated, and ML pipeline retrained on {entry['rows']} rows."
+    }
+
+@app.get("/dataset/list")
+def list_datasets():
+    return {"active": dataset_manager.get_active_id(), "datasets": dataset_manager.list_datasets()}
+
+@app.post("/dataset/activate/{dataset_id}")
+def activate_dataset(dataset_id: str):
+    try:
+        entry = dataset_manager.activate(dataset_id)
+    except KeyError as e:
+        raise HTTPException(404, str(e))
+    active_path = dataset_manager.get_active_path()
+    df = pd.read_csv(active_path)
+    ml_pipeline.train(df)
+    reload_graph(active_path)
+    return {"status": "activated", "dataset": entry}
+
 @app.on_event("startup")
 def startup():
     init_db()
     # Train ML pipeline on startup
-    df = pd.read_csv("transactions.csv")
+    df = pd.read_csv(dataset_manager.get_active_path())
     ml_pipeline.train(df)
     print("[TraceNetX v2.0] All systems online.")
 
@@ -59,13 +97,16 @@ def root():
 
 @app.get("/graph")
 def get_graph(case_id: str = None):
-    return get_graph_data(case_id)
+    # Delegates to /filter's logic (real ML scores, dataset-aware) instead of
+    # the old Neo4j-backed get_graph_data(), which never followed dataset
+    # switches and required a separately-running Neo4j server.
+    return filter_graph(case_id=case_id)
 
 @app.get("/account/{account_id}")
 def get_account(account_id: str):
     details = get_account_details(account_id)
     # Use ML score if available
-    df = pd.read_csv("transactions.csv")
+    df = pd.read_csv(dataset_manager.get_active_path())
     ml_results = ml_pipeline.predict(df)
     ml_result = next((r for r in ml_results if r['account_id'] == account_id), None)
     if ml_result:
@@ -76,27 +117,8 @@ def get_account(account_id: str):
         }
     else:
         risk = calculate_risk(account_id)
-    # Apply same overrides as graph
-    aid = account_id.upper()
-    if 'CRIMINAL' in aid:
-        risk = dict(risk); risk['level'] = 'CRITICAL'; risk['score'] = 92
-    elif 'DEALER' in aid or 'COLLECTOR' in aid:
-        risk = dict(risk); risk['level'] = 'HIGH'; risk['score'] = 75
-    elif 'CRYPTO' in aid:
-        risk = dict(risk); risk['level'] = 'CRITICAL'; risk['score'] = 88
-    elif 'HAWALA' in aid or 'SHELL' in aid:
-        risk = dict(risk); risk['level'] = 'MEDIUM'; risk['score'] = 58
-    elif 'RECRUITER' in aid or 'RECR' in aid:
-        risk = dict(risk); risk['level'] = 'MEDIUM'; risk['score'] = 55
-    elif aid.startswith('ACC_'):
-        # Keep the flags from risk.py, just override level and score
-        real_risk = calculate_risk(account_id)
-        risk = dict(risk)
-        risk['level'] = 'CLEAR'
-        risk['score'] = 15
-        risk['flags'] = real_risk.get('flags', [])
     # Add account's own IP
-    df = pd.read_csv("transactions.csv")
+    df = pd.read_csv(dataset_manager.get_active_path())
     own_ip = None
     as_sender = df[df["sender_id"] == account_id]
     as_receiver = df[df["receiver_id"] == account_id]
@@ -109,7 +131,9 @@ def get_account(account_id: str):
 
 @app.get("/filter")
 def filter_graph(ip: str = None, phone: str = None, city: str = None, case_id: str = None):
-    df = pd.read_csv("transactions.csv")
+    from ml_pipeline import ml_pipeline
+    df_full = pd.read_csv(dataset_manager.get_active_path())
+    df = df_full
     if case_id:
         df = df[df["case_id"] == case_id]
     if ip:
@@ -125,33 +149,32 @@ def filter_graph(ip: str = None, phone: str = None, city: str = None, case_id: s
         nodes.add(row["receiver_id"])
         edges.append({"source": row["sender_id"], "target": row["receiver_id"], "amount": row["amount"], "transfer_type": row.get("transfer_type", "DIGITAL")})
 
-    def apply_override(account_id, risk):
-        aid = account_id.upper()
-        if 'CRIMINAL' in aid:
-            risk = dict(risk); risk['level'] = 'CRITICAL'; risk['score'] = 92
-        elif 'DEALER' in aid or 'COLLECTOR' in aid:
-            risk = dict(risk); risk['level'] = 'HIGH'; risk['score'] = 75
-        elif 'CRYPTO' in aid:
-            risk = dict(risk); risk['level'] = 'CRITICAL'; risk['score'] = 88
-        elif 'HAWALA' in aid or 'SHELL' in aid:
-            risk = dict(risk); risk['level'] = 'MEDIUM'; risk['score'] = 58
-        elif 'RECRUITER' in aid or 'RECR' in aid:
-            risk = dict(risk); risk['level'] = 'MEDIUM'; risk['score'] = 55
-        elif aid.startswith('ACC_'):
-            risk = dict(risk); risk['level'] = 'CLEAR'; risk['score'] = 15
-        return risk
+    # Real ML scores, computed on the FULL active dataset (not the filtered
+    # subset) so risk levels here match /graph and /account/{id} exactly —
+    # this was previously always falling back to the weak calculate_risk().
+    ml_results = {}
+    if ml_pipeline.is_trained:
+        results = ml_pipeline.predict(df_full)
+        for r in results:
+            ml_results[r['account_id']] = {
+                "score": r['risk_score'],
+                "level": r['risk_level'],
+                "flags": r['flags'],
+                "mule_type": r['mule_type'],
+                "shap_explanation": r['shap_explanation'],
+                "recommended_action": r['recommended_action']
+            }
 
     node_list = []
     for n in nodes:
-        risk = calculate_risk(n)
-        risk = apply_override(n, risk)
+        risk = ml_results.get(n) or calculate_risk(n)
         node_list.append({"id": n, "risk": risk})
 
     return {"nodes": node_list, "edges": edges}
 
 @app.get("/path")
 def find_path(source: str, target: str):
-    df = pd.read_csv("transactions.csv")
+    df = pd.read_csv(dataset_manager.get_active_path())
     graph = {}
     for _, row in df.iterrows():
         s, r = row["sender_id"], row["receiver_id"]
@@ -194,24 +217,21 @@ def find_path(source: str, target: str):
 
 @app.get("/dashboard")
 def get_dashboard():
-    df = pd.read_csv("transactions.csv")
+    df = pd.read_csv(dataset_manager.get_active_path())
     accounts = set(df["sender_id"]).union(set(df["receiver_id"]))
     risk_data = []
-    for acc in accounts:
-        aid = acc.upper()
-        if 'CRIMINAL' in aid:
-            level, score = 'CRITICAL', 92
-        elif 'DEALER' in aid or 'COLLECTOR' in aid:
-            level, score = 'HIGH', 75
-        elif 'CRYPTO' in aid:
-            level, score = 'CRITICAL', 88
-        elif 'HAWALA' in aid or 'SHELL' in aid:
-            level, score = 'MEDIUM', 58
-        elif 'RECRUITER' in aid or 'RECR' in aid:
-            level, score = 'MEDIUM', 55
-        else:
-            level, score = 'CLEAR', 15
-        risk_data.append({"account": acc, "score": score, "level": level})
+    if ml_pipeline.is_trained:
+        ml_results = ml_pipeline.predict(df)
+        ml_lookup = {r['account_id']: r for r in ml_results}
+        for acc in accounts:
+            if acc in ml_lookup:
+                r = ml_lookup[acc]
+                risk_data.append({"account": acc, "score": r['risk_score'], "level": r['risk_level']})
+            else:
+                risk_data.append({"account": acc, "score": 15, "level": "CLEAR"})
+    else:
+        for acc in accounts:
+            risk_data.append({"account": acc, "score": 15, "level": "CLEAR"})
     risk_data.sort(key=lambda x: x["score"], reverse=True)
     city_flow = df.groupby("sender_city")["amount"].sum().reset_index()
     city_data = [{"city": row["sender_city"], "amount": float(row["amount"])} for _, row in city_flow.iterrows()]
@@ -220,13 +240,15 @@ def get_dashboard():
     daily = timeline.groupby("date")["amount"].sum().reset_index()
     daily_data = [{"date": row["date"], "amount": float(row["amount"])} for _, row in daily.iterrows()]
     return {
-        "risk_data": risk_data[:10],
+        "risk_data": risk_data,
         "city_data": city_data,
         "daily_data": daily_data,
         "total_amount": float(df["amount"].sum()),
         "total_transactions": len(df),
+        "critical_count": sum(1 for r in risk_data if r["level"] == "CRITICAL"),
         "high_risk_count": sum(1 for r in risk_data if r["level"] == "HIGH"),
-        "medium_risk_count": sum(1 for r in risk_data if r["level"] == "MEDIUM")
+        "medium_risk_count": sum(1 for r in risk_data if r["level"] == "MEDIUM"),
+        "safe_count": sum(1 for r in risk_data if r["level"] == "CLEAR")
     }
 
 @app.get("/model-validation")
@@ -304,7 +326,7 @@ def get_model_validation():
 @app.get("/ml/analyze")
 def ml_analyze_all():
     """Run full ML pipeline on all accounts — real ensemble output only, no overrides"""
-    df = pd.read_csv("transactions.csv")
+    df = pd.read_csv(dataset_manager.get_active_path())
     results = ml_pipeline.predict(df)
     results.sort(key=lambda x: x['risk_score'], reverse=True)
     return {
@@ -321,7 +343,7 @@ def ml_analyze_all():
 @app.get("/ml/account/{account_id}")
 def ml_analyze_account(account_id: str):
     """Run ML analysis on specific account with SHAP explanation"""
-    df = pd.read_csv("transactions.csv")
+    df = pd.read_csv(dataset_manager.get_active_path())
     results = ml_pipeline.predict(df)
     account_result = next((r for r in results if r['account_id'] == account_id), None)
     if not account_result:
@@ -338,7 +360,7 @@ def ml_analyze_account(account_id: str):
 @app.get("/alerts")
 def get_alerts():
     """Top highest-risk accounts, formatted for the live AlertSystem popup feed"""
-    df = pd.read_csv("transactions.csv")
+    df = pd.read_csv(dataset_manager.get_active_path())
     results = ml_pipeline.predict(df)
     results.sort(key=lambda x: x['risk_score'], reverse=True)
     top_risk = [r for r in results if r['risk_level'] in ('CRITICAL', 'HIGH')][:4]
@@ -415,7 +437,7 @@ def identity_fusion():
 @app.get("/evidence/{account_id}")
 def generate_evidence(account_id: str):
     """Generate court-ready evidence package for ED/CBI"""
-    df = pd.read_csv("transactions.csv")
+    df = pd.read_csv(dataset_manager.get_active_path())
     ml_results = ml_pipeline.predict(df)
     account_result = next((r for r in ml_results if r['account_id'] == account_id), None)
     if not account_result:
@@ -445,7 +467,7 @@ from lstm_temporal import lstm_detector  # TemporalPatternEngine instance — ru
 @app.get("/temporal/analyze")
 def temporal_analyze_all():
     """Run LSTM temporal pattern detection on all accounts"""
-    df = pd.read_csv("transactions.csv")
+    df = pd.read_csv(dataset_manager.get_active_path())
     results = lstm_detector.analyze_all_accounts(df)
     # Apply role-based overrides to temporal risk levels
     for r in results:
@@ -478,7 +500,7 @@ def temporal_analyze_all():
 @app.get("/temporal/account/{account_id}")
 def temporal_analyze_account(account_id: str):
     """Run temporal analysis on specific account"""
-    df = pd.read_csv("transactions.csv")
+    df = pd.read_csv(dataset_manager.get_active_path())
     result = lstm_detector.analyze_account_timeline(account_id, df)
     if not result:
         return {"error": f"No temporal data found for {account_id}"}
@@ -487,7 +509,7 @@ def temporal_analyze_account(account_id: str):
 @app.get("/city/flows")
 def get_city_flows():
     """Get inter-city transaction flows with full account details"""
-    df = pd.read_csv("transactions.csv")
+    df = pd.read_csv(dataset_manager.get_active_path())
     
     # Build city lookup from sender data
     sender_city = dict(zip(df["sender_id"], df["sender_city"]))
@@ -544,17 +566,18 @@ def get_city_flows():
         })
     
     # Inject hawala city flows (city map only, not spider map)
-    hawala_flows = [
-        {"from_city": "Mumbai", "to_city": "Delhi", "total_amount": 195000, "transactions": [{"sender": "HAWALA_AGENT1", "receiver": "DEALER_DELHI1", "amount": 195000, "timestamp": "2024-01-16 10:00:00", "transfer_type": "SUSPECTED_CASH"}]},
-        {"from_city": "Chennai", "to_city": "Mumbai", "total_amount": 210000, "transactions": [{"sender": "HAWALA_AGENT2", "receiver": "DEALER_MUM1", "amount": 210000, "timestamp": "2024-01-16 11:00:00", "transfer_type": "SUSPECTED_CASH"}]},
-        {"from_city": "Hyderabad", "to_city": "Bangalore", "total_amount": 188000, "transactions": [{"sender": "HAWALA_AGENT3", "receiver": "DEALER_BLR1", "amount": 188000, "timestamp": "2024-01-16 11:30:00", "transfer_type": "SUSPECTED_CASH"}]},
-        {"from_city": "Kolkata", "to_city": "Delhi", "total_amount": 165000, "transactions": [{"sender": "HAWALA_AGENT4", "receiver": "DEALER_DEL2", "amount": 165000, "timestamp": "2024-01-16 12:00:00", "transfer_type": "SUSPECTED_CASH"}]},
-        {"from_city": "Bangalore", "to_city": "Kolkata", "total_amount": 143000, "transactions": [{"sender": "HAWALA_AGENT5", "receiver": "DEALER_KOL1", "amount": 143000, "timestamp": "2024-01-16 12:30:00", "transfer_type": "SUSPECTED_CASH"}]},
-    ]
-    for hf in hawala_flows:
-        key = hf["from_city"] + "||" + hf["to_city"]
-        if key not in city_pairs:
-            city_pairs[key] = hf
+    if dataset_manager.get_active_id() == "demo":
+        hawala_flows = [
+            {"from_city": "Mumbai", "to_city": "Delhi", "total_amount": 195000, "transactions": [{"sender": "HAWALA_AGENT1", "receiver": "DEALER_DELHI1", "amount": 195000, "timestamp": "2024-01-16 10:00:00", "transfer_type": "SUSPECTED_CASH"}]},
+            {"from_city": "Chennai", "to_city": "Mumbai", "total_amount": 210000, "transactions": [{"sender": "HAWALA_AGENT2", "receiver": "DEALER_MUM1", "amount": 210000, "timestamp": "2024-01-16 11:00:00", "transfer_type": "SUSPECTED_CASH"}]},
+            {"from_city": "Hyderabad", "to_city": "Bangalore", "total_amount": 188000, "transactions": [{"sender": "HAWALA_AGENT3", "receiver": "DEALER_BLR1", "amount": 188000, "timestamp": "2024-01-16 11:30:00", "transfer_type": "SUSPECTED_CASH"}]},
+            {"from_city": "Kolkata", "to_city": "Delhi", "total_amount": 165000, "transactions": [{"sender": "HAWALA_AGENT4", "receiver": "DEALER_DEL2", "amount": 165000, "timestamp": "2024-01-16 12:00:00", "transfer_type": "SUSPECTED_CASH"}]},
+            {"from_city": "Bangalore", "to_city": "Kolkata", "total_amount": 143000, "transactions": [{"sender": "HAWALA_AGENT5", "receiver": "DEALER_KOL1", "amount": 143000, "timestamp": "2024-01-16 12:30:00", "transfer_type": "SUSPECTED_CASH"}]},
+        ]
+        for hf in hawala_flows:
+            key = hf["from_city"] + "||" + hf["to_city"]
+            if key not in city_pairs:
+                city_pairs[key] = hf
         city_totals[hf["from_city"]] = city_totals.get(hf["from_city"], 0) + hf["total_amount"]
 
     return {
@@ -574,7 +597,7 @@ def export_csv():
       batch recruitment member) come from live Neo4j graph intelligence
     No account-name string matching anywhere in this endpoint.
     """
-    df = pd.read_csv("transactions.csv")
+    df = pd.read_csv(dataset_manager.get_active_path())
     ml_results = ml_pipeline.predict(df)
     ml_by_account = {r["account_id"]: r for r in ml_results}
 
