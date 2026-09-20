@@ -20,8 +20,21 @@ const RISK_SIZE = {
 
 const TIER_ORDER = ["CRITICAL","HIGH","MEDIUM","SAFE","CLEAR","LOW"];
 
+const ROLE_COLOR = {
+  CRIMINAL:     "#FF2D2D",
+  RECRUITER:    "#FFA000",
+  MULE:         "#00C853",
+  INTERMEDIARY: "#FFD600",
+  DEALER:       "#FF2D2D",
+  CRYPTO:       "#FF6B00",
+};
+const ROLE_SIZE = { CRIMINAL: 44, RECRUITER: 34, MULE: 24, INTERMEDIARY: 32, DEALER: 44, CRYPTO: 32 };
+const ROLE_TIER = { CRIMINAL: 0, RECRUITER: 1, MULE: 2, INTERMEDIARY: 3, DEALER: 4, CRYPTO: 4 };
+let ROLES_ON = false;
+
 function getTier(node) {
   const id = node.id.toUpperCase();
+  if (ROLES_ON && node.role) return ROLE_TIER[node.role] !== undefined ? ROLE_TIER[node.role] : 2;
   if (id.includes("CRIMINAL")) return 0;
   if (id.includes("RECRUITER") || id.includes("RECR")) return 1;
   if (id.startsWith("ACC_") || id.includes("MULE")) return 2;
@@ -52,6 +65,7 @@ function SpiderMap({ graphData, onNodeClick, organized = true }) {
 
   useEffect(() => {
     if (!graphData.nodes.length) return;
+    ROLES_ON = graphData.nodes.some(function (x) { return x.role && x.role !== "MULE"; });
 
     const canvas = canvasRef.current;
     const ctx    = canvas.getContext("2d");
@@ -148,8 +162,8 @@ function SpiderMap({ graphData, onNodeClick, organized = true }) {
         });
         ids.forEach(id => {
           const p = positions[id];
-          const isCriminal = id.toUpperCase().includes("CRIMINAL");
-          const isDealer = id.toUpperCase().includes("DEALER");
+          const isCriminal = ROLES_ON ? (positions[id].node && positions[id].node.role === "CRIMINAL") : id.toUpperCase().includes("CRIMINAL");
+          const isDealer = ROLES_ON ? (positions[id].node && positions[id].node.role === "DEALER") : id.toUpperCase().includes("DEALER");
           let pullX = W/2, pullY = H/2, pull = 0.004;
           if (isCriminal) {
             pullX = W/2; pullY = H * 0.3; pull = 0.05;
@@ -216,11 +230,11 @@ function SpiderMap({ graphData, onNodeClick, organized = true }) {
         if (id.includes("DEALER") || id.includes("COLLECTOR") || id.includes("CRYPTO")) namedTier[4] = true;
       });
       const bands = [
-        { y: TIER_Y[0], label: namedTier[0] ? "CRIMINAL LAYER" : "CRITICAL RISK",        col: "rgba(255,45,45,0.08)"  },
-        { y: TIER_Y[1], label: namedTier[1] ? "RECRUITER LAYER" : "CRITICAL RISK",       col: "rgba(255,107,0,0.06)"  },
+        { y: TIER_Y[0], label: (ROLES_ON || namedTier[0]) ? "CRIMINAL LAYER" : "CRITICAL RISK",        col: "rgba(255,45,45,0.08)"  },
+        { y: TIER_Y[1], label: (ROLES_ON || namedTier[1]) ? "RECRUITER LAYER" : "CRITICAL RISK",       col: "rgba(255,107,0,0.06)"  },
         { y: TIER_Y[2], label: "STANDARD ACCOUNTS",                                      col: "rgba(0,200,83,0.04)"   },
-        { y: TIER_Y[3], label: namedTier[3] ? "INTERMEDIARY LAYER" : "ELEVATED RISK",    col: "rgba(255,179,0,0.06)"  },
-        { y: TIER_Y[4], label: namedTier[4] ? "COLLECTION / EXIT" : "ELEVATED RISK",     col: "rgba(0,100,255,0.07)"  },
+        { y: TIER_Y[3], label: (ROLES_ON || namedTier[3]) ? "INTERMEDIARY LAYER" : "ELEVATED RISK",    col: "rgba(255,179,0,0.06)"  },
+        { y: TIER_Y[4], label: (ROLES_ON || namedTier[4]) ? "COLLECTION / EXIT" : "ELEVATED RISK",     col: "rgba(0,100,255,0.07)"  },
       ];
       if (state.lerpT > 0.1) bands.forEach(b => {
         ctx.fillStyle = b.col;
@@ -326,12 +340,13 @@ function SpiderMap({ graphData, onNodeClick, organized = true }) {
       Object.values(positions).forEach(p => {
         const n      = p.node;
         const level  = n.risk?.level || "CLEAR";
-        const color  = RISK_COLOR[level] || "#00C853";
-        const r      = RISK_SIZE[level]  || 24;
+        const roleOn = ROLES_ON && n.role;
+        const color  = roleOn ? ROLE_COLOR[n.role] : (RISK_COLOR[level] || "#00C853");
+        const r      = roleOn ? ROLE_SIZE[n.role] : (RISK_SIZE[level] || 24);
         const isSelected = state.selectedId === n.id;
 
         /* CRITICAL pulse ring */
-        if (level === "CRITICAL") {
+        if (roleOn ? (n.role === "CRIMINAL" || n.role === "DEALER") : level === "CRITICAL") {
           const pulse = Math.sin(state.pulseFrame * 0.13) * 0.5 + 0.5;
           /* outer glow */
           const grd = ctx.createRadialGradient(p.x, p.y, r, p.x, p.y, r+28);
@@ -389,7 +404,7 @@ function SpiderMap({ graphData, onNodeClick, organized = true }) {
           ctx.fillStyle = color;
           ctx.textBaseline = "top";
           const badge = level === "CLEAR" ? "SAFE" : level;
-          ctx.fillText(badge, p.x, p.y + r + 4);
+          ctx.fillText(roleOn ? (n.role === "MULE" ? "" : n.role) : badge, p.x, p.y + r + 4);
         }
       });
 

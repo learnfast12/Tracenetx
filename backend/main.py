@@ -165,10 +165,13 @@ def filter_graph(ip: str = None, phone: str = None, city: str = None, case_id: s
                 "recommended_action": r['recommended_action']
             }
 
+    from roles import assign_roles
+    roles = assign_roles(df_full)
+
     node_list = []
     for n in nodes:
         risk = ml_results.get(n) or calculate_risk(n)
-        node_list.append({"id": n, "risk": risk})
+        node_list.append({"id": n, "risk": risk, "role": roles.get(n, "MULE")})
 
     return {"nodes": node_list, "edges": edges}
 

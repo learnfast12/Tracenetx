@@ -359,11 +359,22 @@ function App() {
                 <button className="btn-reset" onClick={() => { setFilters({ ip: "", phone: "", city: "", case_id: filters.case_id }); fetchGraph({ case_id: filters.case_id }); }}>Reset Filters</button>
               </div>
               <div className="legend">
-                <h3>Risk Legend</h3>
+                {(graphData.nodes || []).some(n => n.role && n.role !== "MULE") ? (
+                  <>
+                    <h3>Role Legend</h3>
+                    {[["#FF2D2D", "Criminal / Dealer"], ["#FFA000", "Recruiter"], ["#FFD600", "Hawala / Shell"], ["#FF6B00", "Crypto Gateway"], ["#00C853", "Mule Account"]].map(([c, l]) => (
+                      <div className="legend-item" key={l}><span className="dot" style={{ background: c }}></span>{l}</div>
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    <h3>Risk Legend</h3>
                 <div className="legend-item"><span className="dot critical"></span>Critical</div>
                 <div className="legend-item"><span className="dot high"></span>High Risk</div>
                 <div className="legend-item"><span className="dot medium"></span>Medium Risk</div>
                 <div className="legend-item"><span className="dot clear"></span>Safe</div>
+                  </>
+                )}
                 <div className="legend-item" style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px solid #222", display: "flex", alignItems: "center", gap: "8px" }}>
                   <span style={{ display: "inline-block", width: "28px", height: "0", borderTop: "2px dashed #C9A84C", verticalAlign: "middle" }}></span>
                   <span style={{ color: "#C9A84C", fontSize: "0.85em" }}>Cash Transfer</span>
