@@ -232,15 +232,28 @@ class TraceNetXMLPipeline:
         # Final risk score 0-100
         final_scores = (0.7 * ensemble_proba + 0.3 * iso_normalized) * 100
 
+        # Fuse ML ensemble with graph-structure evidence (no account names used)
+        from graph_evidence import graph_evidence
+        GRAPH_WEIGHT = 0.6
+        try:
+            ev = graph_evidence(df)
+        except Exception:
+            ev = {}
+
         results = []
         for i, row in feature_df.iterrows():
-            score = float(final_scores[i])
+            ml_score = float(final_scores[i])
+            g = ev.get(row['account_id'])
+            score = ((1 - GRAPH_WEIGHT) * ml_score + GRAPH_WEIGHT * g['score']) if g else ml_score
             level, action, mule_type = self.classify_risk(score, row)
             shap_explanation = self.get_shap_explanation(X_scaled[i:i+1])
 
             results.append({
                 'account_id': row['account_id'],
                 'risk_score': round(score, 2),
+                'ml_score': round(ml_score, 2),
+                'graph_score': g['score'] if g else None,
+                'role': g['role'] if g else None,
                 'risk_level': level,
                 'recommended_action': action,
                 'mule_type': mule_type,
