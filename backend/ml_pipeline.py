@@ -239,6 +239,9 @@ class TraceNetXMLPipeline:
             ev = graph_evidence(df)
         except Exception:
             ev = {}
+        # graph fusion only when a layered structure is detected; otherwise pure ML
+        if len({v['role'] for v in ev.values()} - {'MULE'}) < 3:
+            GRAPH_WEIGHT = 0.0
 
         results = []
         for i, row in feature_df.iterrows():

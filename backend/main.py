@@ -165,13 +165,14 @@ def filter_graph(ip: str = None, phone: str = None, city: str = None, case_id: s
                 "recommended_action": r['recommended_action']
             }
 
-    from roles import assign_roles
+    from roles import assign_roles, is_structured
     roles = assign_roles(df_full)
+    structured = is_structured(roles)
 
     node_list = []
     for n in nodes:
         risk = ml_results.get(n) or calculate_risk(n)
-        node_list.append({"id": n, "risk": risk, "role": roles.get(n, "MULE")})
+        node_list.append({"id": n, "risk": risk, "role": (roles.get(n, "MULE") if structured else None)})
 
     return {"nodes": node_list, "edges": edges}
 

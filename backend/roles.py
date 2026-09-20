@@ -62,3 +62,9 @@ def assign_roles(df: pd.DataFrame) -> dict:
         else:
             roles[a] = "MULE"
     return roles
+
+
+def is_structured(roles: dict) -> bool:
+    """True only for a layered network (3+ distinct non-mule roles).
+    Sparse datasets fall back to plain ML levels and risk-based layers."""
+    return len(set(roles.values()) - {"MULE"}) >= 3
