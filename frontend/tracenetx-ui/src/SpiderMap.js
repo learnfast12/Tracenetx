@@ -404,7 +404,7 @@ function SpiderMap({ graphData, onNodeClick, organized = true }) {
           ctx.fillStyle = color;
           ctx.textBaseline = "top";
           const badge = level === "CLEAR" ? "SAFE" : level;
-          ctx.fillText(roleOn ? (n.role === "MULE" ? "" : n.role) : badge, p.x, p.y + r + 4);
+          ctx.fillText(roleOn ? "" : badge, p.x, p.y + r + 4);
         }
       });
 
