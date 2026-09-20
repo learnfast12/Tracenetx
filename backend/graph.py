@@ -80,34 +80,12 @@ def get_graph_data(case_id=None):
             })
 
         from risk import calculate_risk
-        def override_risk(account_id, risk):
-            from dataset_manager import dataset_manager
-            if dataset_manager.get_active_id() != "demo":
-                return risk
-            aid = account_id.upper()
-            if 'CRIMINAL' in aid:
-                risk = dict(risk); risk['level'] = 'CRITICAL'; risk['score'] = 92
-            elif 'DEALER' in aid or 'COLLECTOR' in aid:
-                risk = dict(risk); risk['level'] = 'CRITICAL'; risk['score'] = 88
-            elif 'CRYPTO' in aid:
-                risk = dict(risk); risk['level'] = 'HIGH'; risk['score'] = 78
-            elif 'HAWALA' in aid or 'SHELL' in aid:
-                risk = dict(risk); risk['level'] = 'MEDIUM'; risk['score'] = 58
-            elif 'RECRUITER' in aid or 'RECR' in aid:
-                risk = dict(risk); risk['level'] = 'MEDIUM'; risk['score'] = 55
-            elif aid.startswith('ACC_'):
-                risk = dict(risk); risk['level'] = 'CLEAR'; risk['score'] = 15
-            elif risk.get('level') in ['LOW']:
-                risk = dict(risk); risk['level'] = 'CLEAR'; risk['score'] = 15
-            return risk
-
         node_list = []
         for n in nodes:
             if n in ml_results:
                 risk = ml_results[n]
             else:
                 risk = calculate_risk(n)
-            risk = override_risk(n, risk)
             node_list.append({"id": n, "risk": risk})
 
         EXCLUDE = {"ACC_DUMMY1", "ACC_DUMMY2", "ACC_DUMMY3"}
