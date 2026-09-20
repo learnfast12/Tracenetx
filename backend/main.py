@@ -472,27 +472,6 @@ def temporal_analyze_all():
     """Run LSTM temporal pattern detection on all accounts"""
     df = pd.read_csv(dataset_manager.get_active_path())
     results = lstm_detector.analyze_all_accounts(df)
-    # Apply role-based overrides to temporal risk levels
-    for r in results:
-        aid = r['account_id'].upper()
-        if aid.startswith('ACC_'):
-            r['temporal_risk_level'] = 'CLEAR'
-            r['temporal_risk_score'] = 15
-        elif 'RECRUITER' in aid or 'RECR' in aid:
-            r['temporal_risk_level'] = 'MEDIUM'
-            r['temporal_risk_score'] = 55
-        elif 'HAWALA' in aid or 'SHELL' in aid:
-            r['temporal_risk_level'] = 'MEDIUM'
-            r['temporal_risk_score'] = 58
-        elif 'CRYPTO' in aid:
-            r['temporal_risk_level'] = 'HIGH'
-            r['temporal_risk_score'] = 75
-        elif 'DEALER' in aid or 'COLLECTOR' in aid:
-            r['temporal_risk_level'] = 'CRITICAL'
-            r['temporal_risk_score'] = 90
-        elif 'CRIMINAL' in aid:
-            r['temporal_risk_level'] = 'CRITICAL'
-            r['temporal_risk_score'] = 92
     return {
         "system": "TraceNetX v2.0 — Temporal Analysis",
         "total_flagged": len(results),
