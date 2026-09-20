@@ -361,8 +361,8 @@ function App() {
               <div className="legend">
                 {(graphData.nodes || []).some(n => n.role && n.role !== "MULE") ? (
                   <>
-                    <h3>Role Legend</h3>
-                    {[["#FF2D2D", "Criminal / Dealer"], ["#FFA000", "Recruiter"], ["#FFD600", "Hawala / Shell"], ["#FF6B00", "Crypto Gateway"], ["#00C853", "Mule Account"]].map(([c, l]) => (
+                    <h3>Risk Legend</h3>
+                    {[["#FF2D2D", "Critical"], ["#FF6B00", "High Risk"], ["#FFB300", "Medium Risk"], ["#00C853", "Safe"]].map(([c, l]) => (
                       <div className="legend-item" key={l}><span className="dot" style={{ background: c }}></span>{l}</div>
                     ))}
                   </>
