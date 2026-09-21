@@ -83,7 +83,6 @@ function App() {
   const [filters, setFilters] = useState({ ip: "", phone: "", city: "", case_id: "" });
   const [loading, setLoading] = useState(true);
   const [organizedLayout, setOrganizedLayout] = useState(true);
-  const [activeCase, setActiveCase] = useState("ALL");
   const [activeTab, setActiveTab] = useState("map");
   const [exporting, setExporting] = useState(false);
   const [mlData, setMlData] = useState(null);
@@ -227,7 +226,6 @@ function App() {
 
   useEffect(() => { fetchGraph(); }, []);
 
-  const highRiskCount = (graphData.nodes || []).filter(n => n.risk && n.risk.level === "HIGH").length;
   const medRiskCount = (graphData.nodes || []).filter(n => n.risk && n.risk.level === "MEDIUM").length;
   const totalAmount = (graphData.edges || []).reduce((s, e) => s + (e.amount || 0), 0);
 

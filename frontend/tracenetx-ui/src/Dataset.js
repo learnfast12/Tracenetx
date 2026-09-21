@@ -16,6 +16,7 @@ const COLORS = {
   textDim: "#94A3B8",
 };
 
+// eslint-disable-next-line no-unused-vars
 const getRiskColor = (level) => {
   const map = { CRITICAL: COLORS.critical, HIGH: COLORS.high, MEDIUM: COLORS.medium, LOW: COLORS.low, CLEAR: COLORS.clear };
   return map[level] || COLORS.textMuted;

@@ -18,7 +18,6 @@ const RISK_SIZE = {
   LOW:      24,
 };
 
-const TIER_ORDER = ["CRITICAL","HIGH","MEDIUM","SAFE","CLEAR","LOW"];
 
 const ROLE_COLOR = {
   CRIMINAL:     "#FF2D2D",
@@ -437,6 +436,7 @@ function SpiderMap({ graphData, onNodeClick, organized = true }) {
     };
     canvas.addEventListener("click", handleClick);
     return () => { cancelAnimationFrame(state.animId); canvas.removeEventListener("click", handleClick); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graphData, organized]);
 
   return (
