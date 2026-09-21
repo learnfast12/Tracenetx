@@ -230,7 +230,7 @@ def get_dashboard():
         for acc in accounts:
             if acc in ml_lookup:
                 r = ml_lookup[acc]
-                risk_data.append({"account": acc, "score": r['risk_score'], "level": r['risk_level']})
+                risk_data.append({"account": acc, "score": r['risk_score'], "level": r['risk_level'], "role": r.get('role')})
             else:
                 risk_data.append({"account": acc, "score": 15, "level": "CLEAR"})
     else:

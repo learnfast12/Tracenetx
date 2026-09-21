@@ -33,6 +33,20 @@ class DatasetManager:
                 "rows": None,
             }
         }
+        # re-register uploads that survived a restart
+        import glob as _glob, os as _os, datetime as _dt
+        _up = _os.path.join(_os.path.dirname(DEFAULT_DATASET), "uploaded_datasets")
+        for _fp in sorted(_glob.glob(_os.path.join(_up, "*.csv")), key=_os.path.getmtime):
+            _id, _sep, _nm = _os.path.basename(_fp).partition("_")
+            with open(_fp, "rb") as _f:
+                _rows = max(sum(1 for _l in _f) - 1, 0)
+            self._registry[_id] = {
+                "id": _id,
+                "name": _nm or _os.path.basename(_fp),
+                "path": _fp,
+                "uploaded_at": _dt.datetime.fromtimestamp(_os.path.getmtime(_fp)).isoformat(),
+                "rows": _rows,
+            }
 
     def validate_schema(self, df: pd.DataFrame):
         missing = REQUIRED_COLUMNS - set(df.columns)

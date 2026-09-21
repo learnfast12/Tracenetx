@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, L
 const fmt = (v) => "₹" + (v >= 100000 ? (v/100000).toFixed(1) + "L" : (v/1000).toFixed(0) + "K");
 
 const COLORS = { CRITICAL: "#FF0000", HIGH: "#FF4500", MEDIUM: "#FFA500", LOW: "#00CC44", CLEAR: "#00CC44" };
+const ROLE_TIER = { CRIMINAL: "CRITICAL", DEALER: "CRITICAL", CRYPTO: "HIGH", RECRUITER: "MEDIUM", INTERMEDIARY: "MEDIUM", MULE: "CLEAR" };
 const CITY_COLORS = ["#e74c3c","#f39c12","#27ae60","#58a6ff","#9b59b6","#1abc9c","#e67e22","#2ecc71"];
 
 const CustomTooltip = ({ active, payload, label }) => {
@@ -52,11 +53,14 @@ function Dashboard() {
     </div>
   );
 
+  const structured = data.risk_data.some(r => r.role && r.role !== "MULE");
+  const lvl = r => (structured && ROLE_TIER[r.role]) || r.level;
+
   const riskDist = [
-    { name: "Critical", value: data.risk_data.filter(r => r.level === "CRITICAL").length, color: "#FF0000" },
-    { name: "High Risk", value: data.risk_data.filter(r => r.level === "HIGH").length, color: "#FF4500" },
-    { name: "Medium Risk", value: data.risk_data.filter(r => r.level === "MEDIUM").length, color: "#FFA500" },
-    { name: "Safe", value: data.risk_data.filter(r => r.level === "CLEAR").length, color: "#00CC44" },
+    { name: "Critical", value: data.risk_data.filter(r => lvl(r) === "CRITICAL").length, color: "#FF0000" },
+    { name: "High Risk", value: data.risk_data.filter(r => lvl(r) === "HIGH").length, color: "#FF4500" },
+    { name: "Medium Risk", value: data.risk_data.filter(r => lvl(r) === "MEDIUM").length, color: "#FFA500" },
+    { name: "Safe", value: data.risk_data.filter(r => lvl(r) === "CLEAR").length, color: "#00CC44" },
   ];
 
   return (
@@ -74,9 +78,9 @@ function Dashboard() {
       <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
         <StatCard label="Total Amount" value={fmt(data.total_amount)} color="#58a6ff" icon="💰" />
         <StatCard label="Transactions" value={data.total_transactions} color="#e6edf3" icon="🔄" />
-        <StatCard label="Critical" value={data.risk_data?.filter(r => r.level === "CRITICAL").length || 0} color="#FF0000" icon="🚨" />
-        <StatCard label="High Risk" value={data.risk_data?.filter(r => r.level === "HIGH").length || 0} color="#FF4500" icon="🔴" />
-        <StatCard label="Medium Risk" value={data.risk_data?.filter(r => r.level === "MEDIUM").length || 0} color="#FFA500" icon="⚠️" />
+        <StatCard label="Critical" value={data.risk_data?.filter(r => lvl(r) === "CRITICAL").length || 0} color="#FF0000" icon="🚨" />
+        <StatCard label="High Risk" value={data.risk_data?.filter(r => lvl(r) === "HIGH").length || 0} color="#FF4500" icon="🔴" />
+        <StatCard label="Medium Risk" value={data.risk_data?.filter(r => lvl(r) === "MEDIUM").length || 0} color="#FFA500" icon="⚠️" />
       </div>
 
       {/* Bar Chart — full width */}
@@ -92,7 +96,7 @@ function Dashboard() {
             <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
             <Bar dataKey="score" radius={[6, 6, 0, 0]}>
               {data.risk_data.map((entry, i) => (
-                <Cell key={i} fill={COLORS[entry.level] || "#27ae60"} />
+                <Cell key={i} fill={COLORS[lvl(entry)] || "#27ae60"} />
               ))}
             </Bar>
           </BarChart>
