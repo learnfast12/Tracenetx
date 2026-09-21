@@ -96,6 +96,7 @@ function App() {
   const [temporalLoading, setTemporalLoading] = useState(false);
   const [validationData, setValidationData] = useState(null);
   const [validationLoading, setValidationLoading] = useState(false);
+  const [dataVersion, setDataVersion] = useState(0);
 
   const fetchGraph = async (activeFilters = {}) => {
     setLoading(true);
@@ -219,7 +220,9 @@ function App() {
       const data = await res.json();
       setActiveDatasetId(data.active || "demo");
     } catch (e) { console.error(e); }
+    setDataVersion(v => v + 1);
     fetchGraph();
+    fetchML(); fetchIntelligence(); fetchTemporal();
   };
 
   useEffect(() => { fetchGraph(); }, []);
@@ -906,7 +909,7 @@ function App() {
         )}
 
         {activeTab === "dataset" && <Dataset onViewMLAnalysis={() => handleTabSwitch("ml")} onDatasetActivated={handleDatasetActivated} />}
-        {activeTab === "dashboard" && <div style={{ flex: 1, overflowY: "auto" }}><Dashboard /></div>}
+        {activeTab === "dashboard" && <div style={{ flex: 1, overflowY: "auto" }}><Dashboard key={dataVersion} /></div>}
         {activeTab === "citymap" && <div style={{ flex: 1 }}><CityMap key={activeDatasetId} graphData={graphData} onCityClick={(city) => {
   setActiveTab("map");
   const newFilters = { ip: "", phone: "", city: city, case_id: filters.case_id };
