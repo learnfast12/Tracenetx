@@ -5,7 +5,8 @@ const fmt = (v) => "₹" + (v >= 100000 ? (v/100000).toFixed(1) + "L" : (v/1000)
 
 const COLORS = { CRITICAL: "#FF0000", HIGH: "#FF4500", MEDIUM: "#FFA500", LOW: "#00CC44", CLEAR: "#00CC44" };
 const ROLE_TIER = { CRIMINAL: "CRITICAL", DEALER: "CRITICAL", CRYPTO: "HIGH", RECRUITER: "HIGH", INTERMEDIARY: "MEDIUM", MULE: "CLEAR" };
-const cityColor = (i, n) => `hsl(${Math.round((i * 360) / Math.max(n, 1))}, 65%, 55%)`;
+const CITY_COLOR_OVERRIDES = { Delhi: "#FF8C00" };
+const cityColor = (i, n, name) => CITY_COLOR_OVERRIDES[name] || `hsl(${Math.round((i * 360) / Math.max(n, 1))}, 65%, 55%)`;
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -148,7 +149,7 @@ function Dashboard() {
                 nameKey="city"
               >
                 {data.city_data.map((_, i) => (
-                  <Cell key={i} fill={cityColor(i, data.city_data.length)} />
+                  <Cell key={i} fill={cityColor(i, data.city_data.length, data.city_data[i].city)} />
                 ))}
               </Pie>
               <Tooltip contentStyle={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8 }} formatter={(v) => fmt(v)} />
