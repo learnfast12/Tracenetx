@@ -141,7 +141,9 @@ function Dashboard() {
                 cx="50%" cy="45%"
                 innerRadius={55}
                 outerRadius={80}
-                paddingAngle={3}
+                paddingAngle={1}
+                stroke="#161b22"
+                strokeWidth={2}
                 dataKey="amount"
                 nameKey="city"
               >
