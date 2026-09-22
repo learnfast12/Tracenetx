@@ -154,7 +154,7 @@ class TraceNetXMLPipeline:
 
         # XGBoost
         print("[TraceNetX ML] Training XGBoost...")
-        self.xgb_model = xgb.XGBClassifier(
+        self.xgb_model = xgb.XGBClassifier(n_jobs=1, 
             n_estimators=200,
             max_depth=6,
             learning_rate=0.1,
@@ -167,7 +167,7 @@ class TraceNetXMLPipeline:
 
         # LightGBM
         print("[TraceNetX ML] Training LightGBM...")
-        self.lgb_model = lgb.LGBMClassifier(
+        self.lgb_model = lgb.LGBMClassifier(n_jobs=1, 
             n_estimators=200,
             max_depth=6,
             learning_rate=0.1,
@@ -179,7 +179,7 @@ class TraceNetXMLPipeline:
 
         # Random Forest
         print("[TraceNetX ML] Training Random Forest...")
-        self.rf_model = RandomForestClassifier(
+        self.rf_model = RandomForestClassifier(n_jobs=1, 
             n_estimators=100,
             class_weight='balanced',
             random_state=42
@@ -188,7 +188,7 @@ class TraceNetXMLPipeline:
 
         # Isolation Forest (anomaly detection)
         print("[TraceNetX ML] Training Isolation Forest...")
-        self.iso_forest = IsolationForest(
+        self.iso_forest = IsolationForest(n_jobs=1, 
             contamination=0.1,
             random_state=42
         )
@@ -243,12 +243,28 @@ class TraceNetXMLPipeline:
         if len({v['role'] for v in ev.values()} - {'MULE'}) < 3:
             GRAPH_WEIGHT = 0.0
 
+        # role-based tiers so every tab matches the Spider Map (layered networks only)
+        structured = GRAPH_WEIGHT > 0
+        ROLE_TIER = {"CRIMINAL": "CRITICAL", "DEALER": "CRITICAL", "CRYPTO": "HIGH",
+                     "RECRUITER": "HIGH", "INTERMEDIARY": "MEDIUM"}
+        probe = {}
+        if structured and len(feature_df):
+            for sc in range(100, -1, -1):
+                probe.setdefault(self.classify_risk(sc, feature_df.iloc[0])[0], sc)
+
         results = []
         for i, row in feature_df.iterrows():
             ml_score = float(final_scores[i])
             g = ev.get(row['account_id'])
             score = ((1 - GRAPH_WEIGHT) * ml_score + GRAPH_WEIGHT * g['score']) if g else ml_score
             level, action, mule_type = self.classify_risk(score, row)
+            if structured and g:
+                tier = ROLE_TIER.get(g['role'])
+                if tier is None and level in ("CRITICAL", "HIGH", "MEDIUM"):
+                    tier = "LOW"
+                if tier and tier in probe:
+                    level = tier
+                    action = self.classify_risk(probe[tier], row)[1]
             shap_explanation = self.get_shap_explanation(X_scaled[i:i+1])
 
             results.append({
@@ -410,16 +426,16 @@ class TraceNetXMLPipeline:
         except Exception as e:
             print(f"[TraceNetX ML] SMOTE failed ({e}), using raw training data")
         print("[TraceNetX ML] Training XGBoost...")
-        self.xgb_model = xgb.XGBClassifier(n_estimators=200, max_depth=6, learning_rate=0.1, scale_pos_weight=10, random_state=42, eval_metric='logloss', verbosity=0)
+        self.xgb_model = xgb.XGBClassifier(n_jobs=1, n_estimators=200, max_depth=6, learning_rate=0.1, scale_pos_weight=10, random_state=42, eval_metric='logloss', verbosity=0)
         self.xgb_model.fit(X_train, y_train)
         print("[TraceNetX ML] Training LightGBM...")
-        self.lgb_model = lgb.LGBMClassifier(n_estimators=200, max_depth=6, learning_rate=0.1, class_weight='balanced', random_state=42, verbose=-1)
+        self.lgb_model = lgb.LGBMClassifier(n_jobs=1, n_estimators=200, max_depth=6, learning_rate=0.1, class_weight='balanced', random_state=42, verbose=-1)
         self.lgb_model.fit(X_train, y_train)
         print("[TraceNetX ML] Training Random Forest...")
-        self.rf_model = RandomForestClassifier(n_estimators=100, class_weight='balanced', random_state=42)
+        self.rf_model = RandomForestClassifier(n_jobs=1, n_estimators=100, class_weight='balanced', random_state=42)
         self.rf_model.fit(X_train, y_train)
         print("[TraceNetX ML] Training Isolation Forest...")
-        self.iso_forest = IsolationForest(contamination=0.01, random_state=42)
+        self.iso_forest = IsolationForest(n_jobs=1, contamination=0.01, random_state=42)
         self.iso_forest.fit(X_train)  # train split only — consistent with no test leakage
         print("[TraceNetX ML] Building SHAP explainer...")
         self.explainer = shap.TreeExplainer(self.xgb_model)

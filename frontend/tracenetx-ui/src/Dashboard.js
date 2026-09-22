@@ -4,7 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, L
 const fmt = (v) => "₹" + (v >= 100000 ? (v/100000).toFixed(1) + "L" : (v/1000).toFixed(0) + "K");
 
 const COLORS = { CRITICAL: "#FF0000", HIGH: "#FF4500", MEDIUM: "#FFA500", LOW: "#00CC44", CLEAR: "#00CC44" };
-const ROLE_TIER = { CRIMINAL: "CRITICAL", DEALER: "CRITICAL", CRYPTO: "HIGH", RECRUITER: "MEDIUM", INTERMEDIARY: "MEDIUM", MULE: "CLEAR" };
+const ROLE_TIER = { CRIMINAL: "CRITICAL", DEALER: "CRITICAL", CRYPTO: "HIGH", RECRUITER: "HIGH", INTERMEDIARY: "MEDIUM", MULE: "CLEAR" };
 const CITY_COLORS = ["#e74c3c","#f39c12","#27ae60","#58a6ff","#9b59b6","#1abc9c","#e67e22","#2ecc71"];
 
 const CustomTooltip = ({ active, payload, label }) => {

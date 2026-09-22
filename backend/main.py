@@ -236,7 +236,7 @@ def get_dashboard():
     else:
         for acc in accounts:
             risk_data.append({"account": acc, "score": 15, "level": "CLEAR"})
-    risk_data.sort(key=lambda x: x["score"], reverse=True)
+    risk_data.sort(key=lambda x: ({"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "CLEAR": 4, "SAFE": 4}.get(x["level"], 5), -x["score"]))
     city_flow = df.groupby("sender_city")["amount"].sum().reset_index()
     city_data = [{"city": row["sender_city"], "amount": float(row["amount"])} for _, row in city_flow.iterrows()]
     timeline = df.copy()
@@ -332,7 +332,7 @@ def ml_analyze_all():
     """Run full ML pipeline on all accounts — real ensemble output only, no overrides"""
     df = pd.read_csv(dataset_manager.get_active_path())
     results = ml_pipeline.predict(df)
-    results.sort(key=lambda x: x['risk_score'], reverse=True)
+    results.sort(key=lambda x: ({"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "CLEAR": 4, "SAFE": 4}.get(x['risk_level'], 5), -x['risk_score']))
     return {
         "system": "TraceNetX v2.0 — ML Analysis",
         "total_accounts_analyzed": len(results),
