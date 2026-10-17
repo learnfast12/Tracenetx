@@ -6,6 +6,7 @@ import PathFinder from "./PathFinder";
 import Dashboard from "./Dashboard";
 import CityMap from "./CityMap";
 import Dataset from "./Dataset";
+import Investigation from "./Investigation";
 import "./App.css";
 
 const COLORS = {
@@ -309,6 +310,7 @@ function App() {
             ["ml", "🤖 ML Analysis"],
             ["intelligence", "🧠 Intelligence"],
             ["temporal", "⏱ Temporal"],
+            ["investigation", "🎯 Investigation"],
             // ["validation", "🔬 Model Validation"], // hidden post-BOI, re-enable if needed
             ["dataset", "📁 Dataset"],
             ["dashboard", "📊 Dashboard"],
@@ -648,11 +650,15 @@ function App() {
                   <span style={{ color: COLORS.textMuted, fontSize: "0.82em" }}>accounts flagged with temporal anomaly patterns</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                  {temporalData.results.map(r => (
-                    <div key={r.account_id} style={{ background: COLORS.navyCard, border: `1px solid ${COLORS.navyBorder}`, borderLeft: `3px solid ${getRiskColor(r.temporal_risk_level)}`, borderRadius: "6px", padding: "16px" }}>
+                  {temporalData.results.map(r => {
+                    const ROLE_COLOR = { CRIMINAL: "#FF2D2D", DEALER: "#FF2D2D", RECRUITER: "#FFA000", INTERMEDIARY: "#FFD600", CRYPTO: "#FF6B00", MULE: "#00C853" };
+                    const roleOn = !!r.role;
+                    const accent = roleOn ? ROLE_COLOR[r.role] : getRiskColor(r.temporal_risk_level);
+                    return (
+                    <div key={r.account_id} style={{ background: COLORS.navyCard, border: `1px solid ${COLORS.navyBorder}`, borderLeft: `3px solid ${accent}`, borderRadius: "6px", padding: "16px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}>
-                        <span style={{ color: getRiskColor(r.temporal_risk_level), fontWeight: "700", fontSize: "1em", fontFamily: "'IBM Plex Mono', monospace" }}>{r.account_id}</span>
-                        <RiskBadge level={r.temporal_risk_level} />
+                        <span style={{ color: accent, fontWeight: "700", fontSize: "1em", fontFamily: "'IBM Plex Mono', monospace" }}>{r.account_id}</span>
+                        {roleOn ? <span style={{ background: accent + "22", border: `1px solid ${accent}`, color: accent, padding: "3px 10px", borderRadius: "4px", fontSize: "0.72em", fontWeight: "700", fontFamily: "'IBM Plex Mono', monospace" }}>{r.role}</span> : <RiskBadge level={r.temporal_risk_level} />}
                       </div>
                       {r.patterns_detected.map((p, i) => (
                         <div key={i} style={{ background: COLORS.navyAccent, border: `1px solid ${COLORS.navyBorder}`, borderLeft: `2px solid ${getRiskColor(p.severity)}`, borderRadius: "4px", padding: "10px 12px", marginBottom: "8px" }}>
@@ -672,7 +678,8 @@ function App() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </>
             )}
@@ -906,6 +913,7 @@ function App() {
           </div>
         )}
 
+        {activeTab === "investigation" && <Investigation refreshKey={dataVersion} onOpenEvidence={(id) => { fetchEvidence(id); setActiveTab("evidence"); }} />}
         {activeTab === "dataset" && <Dataset onViewMLAnalysis={() => handleTabSwitch("ml")} onDatasetActivated={handleDatasetActivated} />}
         {activeTab === "dashboard" && <div style={{ flex: 1, overflowY: "auto" }}><Dashboard key={dataVersion} /></div>}
         {activeTab === "citymap" && <div style={{ flex: 1 }}><CityMap key={activeDatasetId} graphData={graphData} onCityClick={(city) => {

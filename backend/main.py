@@ -8,6 +8,9 @@ from response_engine import response_engine
 from real_validation import run_real_validation, run_nested_validation
 from geospatial import router as geospatial_router
 from scam_detection import router as scam_router
+from complaints import router as complaints_router, complaint_engine
+from investigation import router as investigation_router
+from baseline import baseline_deviation
 from dataset_manager import dataset_manager
 import pandas as pd
 
@@ -26,6 +29,8 @@ app.add_middleware(
 
 app.include_router(geospatial_router)
 app.include_router(scam_router)
+app.include_router(complaints_router)
+app.include_router(investigation_router)
 
 # DATASET UPLOAD ENDPOINTS
 @app.post("/dataset/upload")
@@ -457,6 +462,8 @@ def generate_evidence(account_id: str):
     # No overrides — account_result is the real ml_pipeline.predict() output
     graph_report = graph_intel.full_intelligence_report(account_id)
     package = response_engine.generate_evidence_package(account_id, account_result, graph_report)
+    package["complaint_correlation"] = complaint_engine.account_view(account_id)
+    package["baseline_deviation"] = baseline_deviation(df).get(account_id)
     return package
 
 @app.get("/response/{risk_score}")
@@ -473,6 +480,13 @@ def temporal_analyze_all():
     """Run LSTM temporal pattern detection on all accounts"""
     df = pd.read_csv(dataset_manager.get_active_path())
     results = lstm_detector.analyze_all_accounts(df)
+
+    from roles import assign_roles, is_structured
+    roles = assign_roles(df)
+    structured = is_structured(roles)
+    for r in results:
+        r["role"] = roles.get(r["account_id"], "MULE") if structured else None
+
     return {
         "system": "TraceNetX v2.0 — Temporal Analysis",
         "total_flagged": len(results),
