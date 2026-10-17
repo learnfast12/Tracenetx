@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
 .gstack/
+test_dataset_20k.csv
+gen_test_data.py
+rank_check.py
