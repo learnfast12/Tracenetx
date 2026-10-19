@@ -1,0 +1,203 @@
+{
+ "naive criminals": {
+  "Threshold rules (tuned)": {
+   "auroc": 0.561,
+   "avg_precision": 0.159,
+   "precision_at_k": 0.086,
+   "recall@k": 0.086,
+   "reviewed_for_80pct_recall": 1014.667,
+   "pool": 1320.667,
+   "mules": 105.667,
+   "flag_precision": 0.152,
+   "flag_recall": 0.232,
+   "flag_false_positives": 135.667
+  },
+  "ML behavioural": {
+   "auroc": 0.996,
+   "avg_precision": 0.957,
+   "precision_at_k": 0.939,
+   "recall@k": 0.939,
+   "reviewed_for_80pct_recall": 90.333,
+   "pool": 1320.667,
+   "mules": 105.667,
+   "flag_precision": 0.916,
+   "flag_recall": 0.969,
+   "flag_false_positives": 9.333
+  },
+  "ML + graph structure": {
+   "auroc": 0.998,
+   "avg_precision": 0.967,
+   "precision_at_k": 0.935,
+   "recall@k": 0.935,
+   "reviewed_for_80pct_recall": 90.333,
+   "pool": 1320.667,
+   "mules": 105.667,
+   "flag_precision": 0.905,
+   "flag_recall": 0.974,
+   "flag_false_positives": 10.667
+  },
+  "TraceNetX full (+complaint taint)": {
+   "auroc": 0.998,
+   "avg_precision": 0.958,
+   "precision_at_k": 0.939,
+   "recall@k": 0.939,
+   "reviewed_for_80pct_recall": 88.667,
+   "pool": 1320.667,
+   "mules": 105.667,
+   "flag_precision": 0.913,
+   "flag_recall": 0.98,
+   "flag_false_positives": 9.667
+  },
+  "_settings": {
+   "train_seeds": [
+    1,
+    2
+   ],
+   "test_seeds": [
+    11,
+    12,
+    13
+   ],
+   "tuned_thresholds": {
+    "single": 100000,
+    "count": 15,
+    "daysum": 100000
+   },
+   "train_rows": 2621
+  }
+ },
+ "evasive criminals (structuring under the cap)": {
+  "Threshold rules (tuned)": {
+   "auroc": 0.609,
+   "avg_precision": 0.196,
+   "precision_at_k": 0.106,
+   "recall@k": 0.106,
+   "reviewed_for_80pct_recall": 930.667,
+   "pool": 1321.333,
+   "mules": 106.333,
+   "flag_precision": 0.143,
+   "flag_recall": 0.568,
+   "flag_false_positives": 363.333
+  },
+  "ML behavioural": {
+   "auroc": 0.998,
+   "avg_precision": 0.965,
+   "precision_at_k": 0.944,
+   "recall@k": 0.944,
+   "reviewed_for_80pct_recall": 89.0,
+   "pool": 1321.333,
+   "mules": 106.333,
+   "flag_precision": 0.93,
+   "flag_recall": 0.96,
+   "flag_false_positives": 7.667
+  },
+  "ML + graph structure": {
+   "auroc": 0.998,
+   "avg_precision": 0.963,
+   "precision_at_k": 0.95,
+   "recall@k": 0.95,
+   "reviewed_for_80pct_recall": 89.0,
+   "pool": 1321.333,
+   "mules": 106.333,
+   "flag_precision": 0.918,
+   "flag_recall": 0.984,
+   "flag_false_positives": 9.333
+  },
+  "TraceNetX full (+complaint taint)": {
+   "auroc": 0.998,
+   "avg_precision": 0.958,
+   "precision_at_k": 0.953,
+   "recall@k": 0.953,
+   "reviewed_for_80pct_recall": 88.333,
+   "pool": 1321.333,
+   "mules": 106.333,
+   "flag_precision": 0.934,
+   "flag_recall": 0.978,
+   "flag_false_positives": 7.333
+  },
+  "_settings": {
+   "train_seeds": [
+    1,
+    2
+   ],
+   "test_seeds": [
+    11,
+    12,
+    13
+   ],
+   "tuned_thresholds": {
+    "single": 30000,
+    "count": 15,
+    "daysum": 50000
+   },
+   "train_rows": 2617
+  }
+ },
+ "STRESS: every mule stealthy + structuring, 50% complaint rate": {
+  "Threshold rules (tuned)": {
+   "auroc": 0.589,
+   "avg_precision": 0.178,
+   "precision_at_k": 0.085,
+   "recall@k": 0.085,
+   "reviewed_for_80pct_recall": 887.667,
+   "pool": 1323.333,
+   "mules": 110.0,
+   "flag_precision": 0.125,
+   "flag_recall": 0.472,
+   "flag_false_positives": 363.333
+  },
+  "ML behavioural": {
+   "auroc": 0.997,
+   "avg_precision": 0.967,
+   "precision_at_k": 0.951,
+   "recall@k": 0.951,
+   "reviewed_for_80pct_recall": 91.0,
+   "pool": 1323.333,
+   "mules": 110.0,
+   "flag_precision": 0.951,
+   "flag_recall": 0.949,
+   "flag_false_positives": 5.333
+  },
+  "ML + graph structure": {
+   "auroc": 0.999,
+   "avg_precision": 0.976,
+   "precision_at_k": 0.95,
+   "recall@k": 0.95,
+   "reviewed_for_80pct_recall": 90.667,
+   "pool": 1323.333,
+   "mules": 110.0,
+   "flag_precision": 0.948,
+   "flag_recall": 0.967,
+   "flag_false_positives": 5.667
+  },
+  "TraceNetX full (+complaint taint)": {
+   "auroc": 0.999,
+   "avg_precision": 0.973,
+   "precision_at_k": 0.959,
+   "recall@k": 0.959,
+   "reviewed_for_80pct_recall": 90.667,
+   "pool": 1323.333,
+   "mules": 110.0,
+   "flag_precision": 0.957,
+   "flag_recall": 0.976,
+   "flag_false_positives": 4.667
+  },
+  "_settings": {
+   "train_seeds": [
+    1,
+    2
+   ],
+   "test_seeds": [
+    11,
+    12,
+    13
+   ],
+   "tuned_thresholds": {
+    "single": 30000,
+    "count": 15,
+    "daysum": 50000
+   },
+   "train_rows": 2622
+  }
+ }
+}

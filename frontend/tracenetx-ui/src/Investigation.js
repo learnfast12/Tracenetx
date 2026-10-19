@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import Timeline from "./Timeline";
 
 const COLORS = {
   critical: "#FF2D2D", high: "#FF6B00", medium: "#FFB800", low: "#00C853",
@@ -31,6 +32,7 @@ function Investigation({ onOpenEvidence, refreshKey }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [timelineFor, setTimelineFor] = useState(null);
   const fileRef = useRef(null);
 
   const load = async () => {
@@ -62,6 +64,7 @@ function Investigation({ onOpenEvidence, refreshKey }) {
   const s = data.complaint_stats || {};
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: 24, background: COLORS.navy }}>
+      {timelineFor && <Timeline accountId={timelineFor} onClose={() => setTimelineFor(null)} />}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <div>
           <div style={{ color: COLORS.gold, fontSize: "1.1em", fontWeight: 700, fontFamily: MONO }}>INVESTIGATION · PRIORITISED LEADS</div>
@@ -105,6 +108,10 @@ function Investigation({ onOpenEvidence, refreshKey }) {
             <ul style={{ margin: 0, paddingLeft: 18, color: COLORS.textDim, fontSize: "0.78em", lineHeight: 1.5 }}>
               {l.reasons.slice(0, 4).map((r, j) => <li key={j}>{r}</li>)}
             </ul>
+            <button onClick={() => setTimelineFor(l.account_id)} style={{
+              marginTop: 10, marginRight: 8, background: COLORS.navyAccent, color: COLORS.gold, border: `1px solid ${COLORS.navyBorder}`,
+              borderRadius: 6, padding: "6px 12px", cursor: "pointer", fontFamily: MONO, fontSize: "0.72em",
+            }}>Timeline + money trail →</button>
             {onOpenEvidence && (
               <button onClick={() => onOpenEvidence(l.account_id)} style={{
                 marginTop: 10, background: COLORS.navyAccent, color: COLORS.gold, border: `1px solid ${COLORS.navyBorder}`,

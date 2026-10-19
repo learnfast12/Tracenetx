@@ -1,2 +1,8 @@
 .env
 uploaded_datasets/
+
+__pycache__/
+*.pyc
+*.bak
+uploaded_datasets/
+uploaded_complaints/

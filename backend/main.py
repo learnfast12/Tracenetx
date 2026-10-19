@@ -10,6 +10,7 @@ from geospatial import router as geospatial_router
 from scam_detection import router as scam_router
 from complaints import router as complaints_router, complaint_engine
 from investigation import router as investigation_router
+from timeline import router as timeline_router
 from baseline import baseline_deviation
 from dataset_manager import dataset_manager
 import pandas as pd
@@ -31,6 +32,20 @@ app.include_router(geospatial_router)
 app.include_router(scam_router)
 app.include_router(complaints_router)
 app.include_router(investigation_router)
+app.include_router(timeline_router)
+
+
+@app.get("/benchmark")
+def benchmark_results():
+    """Pre-computed TraceNetX vs threshold-rules benchmark (run `python3 benchmark.py` to regenerate)."""
+    import json, os
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "benchmark_results.json")
+    if not os.path.exists(path):
+        return {"status": "not_run", "message": "Run `python3 benchmark.py` in backend/ to generate benchmark_results.json"}
+    with open(path) as fh:
+        return {"status": "ok",
+                "disclosure": "Synthetic, ground-truth network authored by the team (simulator.py). Measures typology coverage, not real-world accuracy.",
+                "results": json.load(fh)}
 
 # DATASET UPLOAD ENDPOINTS
 @app.post("/dataset/upload")
@@ -258,41 +273,6 @@ def get_dashboard():
         "high_risk_count": sum(1 for r in risk_data if r["level"] == "HIGH"),
         "medium_risk_count": sum(1 for r in risk_data if r["level"] == "MEDIUM"),
         "safe_count": sum(1 for r in risk_data if r["level"] == "CLEAR")
-    }
-
-@app.get("/model-validation")
-def get_model_validation():
-    result = run_real_validation()
-    if result.get("status") != "validated":
-        return {"status": result.get("status", "unavailable"), "message": result.get("message")}
-
-    cv = result.get("cross_validation", {})
-    freeze = result.get("high_risk_freeze_tier", {})
-    leak = result.get("residual_leak_check", {})
-    top_feat = leak.get("top_5_univariate_features", [{}])[0] if leak.get("top_5_univariate_features") else {}
-
-    return {
-        "status": "validated",
-        "dataset": result.get("dataset"),
-        "auprc_mean": cv.get("mean_auprc"),
-        "auroc_mean": cv.get("mean_auc_roc"),
-        "precision_mean": cv.get("mean_precision"),
-        "recall_mean": cv.get("mean_recall"),
-        "f1_mean": cv.get("mean_f1_score"),
-        "freeze_tier": {
-            "label": "HIGH-RISK AUTO-FREEZE",
-            "threshold": freeze.get("threshold"),
-            "precision": (freeze.get("precision_pct") / 100.0) if freeze.get("precision_pct") is not None else None,
-            "n_flagged": freeze.get("flagged_count"),
-            "n_correct": freeze.get("true_positive_count"),
-            "note": freeze.get("note"),
-        },
-        "leak_audit": {
-            "top_residual_feature": top_feat.get("feature"),
-            "univariate_auroc": top_feat.get("univariate_auroc"),
-            "max_univariate_auroc": leak.get("max_univariate_auroc"),
-            "note": leak.get("note"),
-        },
     }
 
 @app.get("/model-validation")

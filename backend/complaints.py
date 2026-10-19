@@ -21,6 +21,7 @@ import pandas as pd
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from dataset_manager import dataset_manager
+from trail import trace_taint, heaviest_chain
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_COMPLAINTS = os.path.join(BASE_DIR, "complaints.csv")
@@ -125,21 +126,14 @@ class ComplaintEngine:
                 "funds_consistent_share": round(float(g["funds_consistent"].mean()), 2),
             }
 
-        # exposure signal: push each complained account's victims downstream
-        exposure = defaultdict(lambda: {"victims": set(), "feeders": set(), "loss": 0.0, "min_hops": 99})
-        feeder_reach = {}
-        for acc, d in direct.items():
-            if acc not in graph_accounts:
-                continue
-            reach = self._downstream(adj, acc)
-            feeder_reach[acc] = reach
-            vic = set(c.loc[c["reported_account"] == acc, "victim_id"])
-            for dst, hops in reach.items():
-                e = exposure[dst]
-                e["victims"] |= vic
-                e["feeders"].add(acc)
-                e["loss"] += d["total_loss"]
-                e["min_hops"] = min(e["min_hops"], hops)
+        # exposure signal: time-respecting, amount-proportional taint propagation (see trail.py)
+        trail = trace_taint(t, c.assign(ts=c["ts"]))
+        self._last_trail = trail
+        exposure = trail["accounts"]
+        feeder_reach = {}   # feeder (complained account) -> {downstream account: hops}, derived from the taint trail
+        for acc, e in exposure.items():
+            for f in e["feeders"]:
+                feeder_reach.setdefault(f, {})[acc] = e["nearest_hops"]
 
         # score per account
         accounts = {}
@@ -150,9 +144,10 @@ class ComplaintEngine:
             if d:
                 s_direct = min(100.0, 25 * min(d["distinct_victims"], 3) + 25 * min(d["total_loss"] / 50000, 1))
             s_exp = 0.0
-            if e and len(e["feeders"]) >= 2:   # one feeder alone is just a pass-through, not convergence
-                s_exp = min(100.0, 10 * min(len(e["victims"]), 8) + 8 * min(len(e["feeders"]), 8)
-                            + 10 * min(e["loss"] / 200000, 1))
+            if e and e["feeder_accounts"] >= 2:   # one feeder alone is just a pass-through, not convergence
+                s_exp = 100.0 * (0.4 * min(e["complaints_reaching"] / 10, 1)
+                                 + 0.4 * min(e["tainted_amount"] / 200000, 1)
+                                 + 0.2 * min(e["feeder_accounts"] / 8, 1))
             score = round(max(s_direct, 0.85 * s_exp), 1)
             if score == 0:
                 continue
@@ -160,10 +155,12 @@ class ComplaintEngine:
                 "complaint_score": score,
                 "direct": d,
                 "exposure": None if not e else {
-                    "victims_reaching": len(e["victims"]),
-                    "feeder_accounts": len(e["feeders"]),
-                    "loss_reaching": round(e["loss"], 2),
-                    "nearest_feeder_hops": e["min_hops"],
+                    "victims_reaching": e["complaints_reaching"],
+                    "feeder_accounts": e["feeder_accounts"],
+                    "loss_reaching": e["tainted_amount"],
+                    "nearest_feeder_hops": e["nearest_hops"],
+                    "tainted_share_of_inflow": e["tainted_share_of_inflow"],
+                    "method": "time-respecting haircut taint propagation",
                 },
                 "in_transaction_graph": a in graph_accounts,
             }
@@ -260,6 +257,17 @@ class ComplaintEngine:
                 "incident_cluster": None if not cl else {k: cl[k] for k in
                     ("cluster_id", "complaints", "distinct_victims", "total_loss", "likely_collector")}}
 
+    def money_trail(self, account_id: str) -> dict:
+        """Heaviest time-ordered chain by which complained victim money reached `account_id`."""
+        self.correlate()
+        tr = getattr(self, "_last_trail", None) or {"accounts": {}}
+        info = tr["accounts"].get(account_id)
+        if not info:
+            return {"account_id": account_id, "reached": False, "chain": []}
+        return {"account_id": account_id, "reached": True,
+                "tainted_amount": info["tainted_amount"], "complaints_reaching": info["complaints_reaching"],
+                "chain": heaviest_chain(tr, account_id)}
+
     def complaint_graph(self) -> dict:
         """Nodes + edges (complaint -> reported account) to overlay on the Spider Map."""
         c = self.load()
@@ -311,6 +319,11 @@ def clusters():
 @router.get("/graph")
 def graph():
     return complaint_engine.complaint_graph()
+
+
+@router.get("/trail/{account_id}")
+def trail(account_id: str):
+    return complaint_engine.money_trail(account_id)
 
 
 @router.get("/account/{account_id}")
