@@ -135,6 +135,10 @@ function Investigation({ onOpenEvidence, refreshKey }) {
                 </span>
               )}
             </div>
+            <a href={`${API}/report/incident/${c.cluster_id}`} target="_blank" rel="noreferrer" style={{
+              float: "right", color: COLORS.gold, border: `1px solid ${COLORS.navyBorder}`, borderRadius: 6,
+              padding: "4px 10px", fontFamily: MONO, fontSize: "0.72em", textDecoration: "none",
+            }}>Incident report (PDF) →</a>
             <div style={{ color: COLORS.textMuted, fontSize: "0.72em", marginTop: 6 }}>
               {c.fraud_types.join(" · ")}{c.shared_phones.length ? ` · shared scammer phones: ${c.shared_phones.length}` : ""}
             </div>

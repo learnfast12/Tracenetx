@@ -262,8 +262,8 @@ class TraceNetXMLPipeline:
             level, action, mule_type = self.classify_risk(score, row)
             if structured and g:
                 tier = ROLE_TIER.get(g['role'])
-                if tier is None and level in ("CRITICAL", "HIGH", "MEDIUM"):
-                    tier = "LOW"
+                if tier is None and level in ("CRITICAL", "HIGH"):
+                    tier = "HIGH"      # plain mules are capped at HIGH; CRITICAL is reserved for coordinators
                 if tier and tier in probe:
                     level = tier
                     action = self.classify_risk(probe[tier], row)[1]
@@ -355,7 +355,7 @@ class TraceNetXMLPipeline:
             GRAPH_WEIGHT = 0.0
         structured = GRAPH_WEIGHT > 0
         ROLE_TIER = {"CRIMINAL": "CRITICAL", "DEALER": "CRITICAL", "CRYPTO": "HIGH",
-                     "RECRUITER": "HIGH", "INTERMEDIARY": "MEDIUM"}
+                     "RECRUITER": "HIGH", "INTERMEDIARY": "HIGH"}
         probe = {}
         if structured and len(f):
             for sc in range(100, -1, -1):
@@ -383,8 +383,8 @@ class TraceNetXMLPipeline:
                 mule_type = "WILLING (knowing participant)"
             if structured and g:
                 tier = ROLE_TIER.get(g["role"])
-                if tier is None and level in ("CRITICAL", "HIGH", "MEDIUM"):
-                    tier = "LOW"
+                if tier is None and level in ("CRITICAL", "HIGH"):
+                    tier = "HIGH"      # plain mules are capped at HIGH; CRITICAL is reserved for coordinators
                 if tier and tier in probe:
                     level = tier
                     action = self.classify_risk(probe[tier], feat_view)[1]

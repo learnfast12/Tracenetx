@@ -11,6 +11,7 @@ from scam_detection import router as scam_router
 from complaints import router as complaints_router, complaint_engine
 from investigation import router as investigation_router
 from timeline import router as timeline_router
+from report import router as report_router
 from baseline import baseline_deviation
 from dataset_manager import dataset_manager
 import pandas as pd
@@ -33,6 +34,7 @@ app.include_router(scam_router)
 app.include_router(complaints_router)
 app.include_router(investigation_router)
 app.include_router(timeline_router)
+app.include_router(report_router)
 
 
 @app.get("/ml/model-info")
@@ -69,7 +71,10 @@ async def upload_dataset(file: UploadFile = File(...)):
     active_path = dataset_manager.get_active_path()
     df = pd.read_csv(active_path)
     ml_pipeline.train(df)
-    reload_graph(active_path)
+    try:
+        reload_graph(active_path)
+    except Exception as e:      # noqa: BLE001  (Neo4j down: pandas-based views still work)
+        print(f"[TraceNetX] graph reload skipped: {type(e).__name__}")
     return {
         "status": "uploaded",
         "dataset": entry,
@@ -89,16 +94,49 @@ def activate_dataset(dataset_id: str):
     active_path = dataset_manager.get_active_path()
     df = pd.read_csv(active_path)
     ml_pipeline.train(df)
-    reload_graph(active_path)
+    try:
+        reload_graph(active_path)
+    except Exception as e:      # noqa: BLE001  (Neo4j down: pandas-based views still work)
+        print(f"[TraceNetX] graph reload skipped: {type(e).__name__}")
     return {"status": "activated", "dataset": entry}
+
+NEO4J_STATE = {"up": False, "error": None}
+
 
 @app.on_event("startup")
 def startup():
-    init_db()
-    # Train ML pipeline on startup
+    # Neo4j powers the graph views, but ML / complaints / timeline / priority leads run on pandas alone,
+    # so a missing database must degrade the app, not kill it.
+    try:
+        init_db()
+        NEO4J_STATE.update(up=True, error=None)
+    except Exception as e:      # noqa: BLE001
+        NEO4J_STATE.update(up=False, error=type(e).__name__)
+        print(f"[TraceNetX v2.0] WARNING: Neo4j unavailable ({type(e).__name__}). Graph views are disabled; "
+              "everything else works. Start it with: docker start neo4j")
     df = pd.read_csv(dataset_manager.get_active_path())
     ml_pipeline.train(df)
-    print("[TraceNetX v2.0] All systems online.")
+    print("[TraceNetX v2.0] Online." + ("" if NEO4J_STATE["up"] else " (degraded: no Neo4j)"))
+
+
+def _neo4j_down(request, exc):
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=503, content={
+        "error": "graph_database_unavailable",
+        "detail": "This view needs Neo4j. Start it with `docker start neo4j` (wait ~20s) and retry.",
+        "neo4j_error": type(exc).__name__})
+
+
+from neo4j.exceptions import AuthError, ServiceUnavailable, SessionExpired  # noqa: E402
+for _exc in (ServiceUnavailable, SessionExpired, AuthError):
+    app.add_exception_handler(_exc, _neo4j_down)
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok" if NEO4J_STATE["up"] else "degraded", "neo4j": NEO4J_STATE["up"],
+            "ml_trained": bool(getattr(ml_pipeline, "training_info", None)),
+            "dataset": dataset_manager.get_active_id()}
 
 @app.get("/")
 def root():
