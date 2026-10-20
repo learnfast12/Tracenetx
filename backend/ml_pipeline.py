@@ -109,7 +109,9 @@ class TraceNetXMLPipeline:
 
         return pd.DataFrame(rows)
 
-    def train(self, df, labels=None):
+    def train_legacy_rule_labels(self, df, labels=None):
+        """OLD path, kept for reference only: labels were derived from the same features the model
+        then trained on (circular), on a handful of demo rows. No longer used."""
         print("[TraceNetX ML] Engineering features...")
         feature_df = self.engineer_features(df)
 
@@ -208,7 +210,7 @@ class TraceNetXMLPipeline:
 
         return feature_df
 
-    def predict(self, df):
+    def predict_legacy(self, df):
         if not self.is_trained:
             self.train(df)
 
@@ -281,6 +283,120 @@ class TraceNetXMLPipeline:
             })
 
         return sorted(results, key=lambda x: x['risk_score'], reverse=True)
+
+    # ── CURRENT PATH: train on labelled simulated networks, score any uploaded dataset ──────────
+    TRAIN_RECIPE = [(1, 0.0), (2, 1.0), (3, 0.5)]    # (simulator seed, evasion)
+
+    def train(self, df=None, labels=None):
+        """Train once on ground-truth simulated networks (simulator.py); uploaded data is only SCORED.
+
+        Why: the demo/uploaded networks have no labels and are tiny (21 accounts), so fitting on them
+        meant learning our own rule-derived labels. Here labels come from the simulator's known
+        ring membership, features are label-free (features.py), and complaints are NOT a model input
+        (the complaint signal is scored separately in investigation.py, so nothing is double counted).
+        Idempotent: later calls (dataset upload/activate) are no-ops.
+        """
+        if self.is_trained and getattr(self, "training_info", None):
+            return None
+        from features import BEHAVIOURAL, STRUCTURAL, build_features
+        from simulator import simulate
+        cols = BEHAVIOURAL + STRUCTURAL
+        frames = []
+        for seed, ev in self.TRAIN_RECIPE:
+            d, _c, truth = simulate(seed=seed, evasion=ev)
+            f = build_features(d)
+            keep = truth[(truth["role"] != "VICTIM") & (~truth["account_id"].str.startswith("SETTLE_"))]
+            frames.append(f[f["account_id"].isin(keep["account_id"])].merge(keep[["account_id", "is_mule"]], on="account_id"))
+        tr = pd.concat(frames, ignore_index=True)
+        X, y = tr[cols].to_numpy(float), tr["is_mule"].to_numpy()
+        spw = (len(y) - y.sum()) / max(y.sum(), 1)
+        print(f"[TraceNetX ML] Training on {len(tr)} simulated accounts ({int(y.sum())} mules, {len(self.TRAIN_RECIPE)} networks)...")
+        self.feature_names = cols
+        self.xgb_model = xgb.XGBClassifier(n_estimators=250, max_depth=4, learning_rate=0.08, subsample=0.9,
+                                           colsample_bytree=0.9, scale_pos_weight=spw, eval_metric="logloss",
+                                           n_jobs=1, random_state=0, verbosity=0).fit(X, y)
+        self.lgb_model = lgb.LGBMClassifier(n_estimators=250, max_depth=4, learning_rate=0.08, subsample=0.9,
+                                            colsample_bytree=0.9, scale_pos_weight=spw, n_jobs=1,
+                                            random_state=0, verbose=-1).fit(X, y)
+        self.rf_model = RandomForestClassifier(n_estimators=150, class_weight="balanced_subsample", n_jobs=1,
+                                               random_state=0).fit(X, y)
+        self.iso_forest = None     # dropped from scoring: ablation showed it lowers ensemble AUROC
+        self.explainer = shap.TreeExplainer(self.xgb_model)
+        self.training_info = {
+            "source": "simulated ground-truth networks (simulator.py), NOT the uploaded dataset",
+            "networks": [{"seed": sd, "evasion": ev} for sd, ev in self.TRAIN_RECIPE],
+            "accounts": int(len(tr)), "mules": int(y.sum()), "features": cols,
+            "models": ["XGBoost", "LightGBM", "RandomForest"],
+            "excluded": ["complaint features (scored separately)", "account names", "IsolationForest (hurt AUROC)"],
+            "disclosure": "Synthetic training world authored by the team; validate on real bank data before deployment.",
+        }
+        self.is_trained = True
+        return None
+
+    def predict(self, df):
+        if not self.is_trained or not getattr(self, "training_info", None):
+            self.train(df)
+        from features import build_features
+
+        f = build_features(df)
+        legacy = self.engineer_features(df).set_index("account_id")       # for flags / mule-type wording only
+        X = f[self.feature_names].fillna(0).to_numpy(float)
+        proba = (0.5 * self.xgb_model.predict_proba(X)[:, 1] + 0.3 * self.lgb_model.predict_proba(X)[:, 1]
+                 + 0.2 * self.rf_model.predict_proba(X)[:, 1])
+        final_scores = proba * 100
+
+        from graph_evidence import graph_evidence
+        try:
+            ev = graph_evidence(df)
+        except Exception:
+            ev = {}
+        GRAPH_WEIGHT = 0.6
+        if len({v["role"] for v in ev.values()} - {"MULE"}) < 3:
+            GRAPH_WEIGHT = 0.0
+        structured = GRAPH_WEIGHT > 0
+        ROLE_TIER = {"CRIMINAL": "CRITICAL", "DEALER": "CRITICAL", "CRYPTO": "HIGH",
+                     "RECRUITER": "HIGH", "INTERMEDIARY": "MEDIUM"}
+        probe = {}
+        if structured and len(f):
+            for sc in range(100, -1, -1):
+                probe.setdefault(self.classify_risk(sc, {})[0], sc)
+
+        try:
+            shap_all = self.explainer.shap_values(X)
+            if isinstance(shap_all, list):
+                shap_all = shap_all[1]
+        except Exception:
+            shap_all = None
+
+        results = []
+        for i, row in f.iterrows():
+            acc = row["account_id"]
+            lrow = legacy.loc[acc].to_dict() if acc in legacy.index else {}
+            feat_view = {**lrow, "forwarding_ratio": float(row["flow_through"]),
+                         "rapid_transfer": int(row["fast_share"] >= 0.5)}
+            ml_score = float(final_scores[i])
+            g = ev.get(acc)
+            score = ((1 - GRAPH_WEIGHT) * ml_score + GRAPH_WEIGHT * g["score"]) if g else ml_score
+            level, action, mule_type = self.classify_risk(score, feat_view)
+            if structured and g:
+                tier = ROLE_TIER.get(g["role"])
+                if tier is None and level in ("CRITICAL", "HIGH", "MEDIUM"):
+                    tier = "LOW"
+                if tier and tier in probe:
+                    level = tier
+                    action = self.classify_risk(probe[tier], feat_view)[1]
+            if shap_all is not None:
+                imp = sorted(zip(self.feature_names, shap_all[i]), key=lambda kv: -abs(kv[1]))[:5]
+                expl = " | ".join(f"{n} {'increases' if v > 0 else 'decreases'} risk (impact: {v:.3f})" for n, v in imp)
+            else:
+                expl = "Explanation unavailable"
+            results.append({
+                "account_id": acc, "risk_score": round(score, 2), "ml_score": round(ml_score, 2),
+                "graph_score": g["score"] if g else None, "role": g["role"] if g else None,
+                "risk_level": level, "recommended_action": action, "mule_type": mule_type,
+                "shap_explanation": expl, "flags": self.get_flags(feat_view),
+            })
+        return sorted(results, key=lambda x: x["risk_score"], reverse=True)
 
     def classify_risk(self, score, features):
         # Graduated 5-level response system

@@ -35,6 +35,14 @@ app.include_router(investigation_router)
 app.include_router(timeline_router)
 
 
+@app.get("/ml/model-info")
+def ml_model_info():
+    """What the scoring model was trained on (transparency endpoint for judges)."""
+    if not getattr(ml_pipeline, "training_info", None):
+        ml_pipeline.train(None)
+    return ml_pipeline.training_info
+
+
 @app.get("/benchmark")
 def benchmark_results():
     """Pre-computed TraceNetX vs threshold-rules benchmark (run `python3 benchmark.py` to regenerate)."""
