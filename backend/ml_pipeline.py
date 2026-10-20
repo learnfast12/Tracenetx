@@ -378,6 +378,9 @@ class TraceNetXMLPipeline:
             g = ev.get(acc)
             score = ((1 - GRAPH_WEIGHT) * ml_score + GRAPH_WEIGHT * g["score"]) if g else ml_score
             level, action, mule_type = self.classify_risk(score, feat_view)
+            # coordinators / layer operators are knowing participants by structure, never "possible victims"
+            if g and g["role"] in ("CRIMINAL", "DEALER", "RECRUITER", "INTERMEDIARY", "CRYPTO") and score >= 50:
+                mule_type = "WILLING (knowing participant)"
             if structured and g:
                 tier = ROLE_TIER.get(g["role"])
                 if tier is None and level in ("CRITICAL", "HIGH", "MEDIUM"):
