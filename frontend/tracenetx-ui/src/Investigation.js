@@ -128,7 +128,7 @@ function Investigation({ onOpenEvidence, refreshKey }) {
           <div key={c.cluster_id} style={{ background: COLORS.navyCard, border: `1px solid ${COLORS.navyBorder}`, borderRadius: 8, padding: 14 }}>
             <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
               <span style={{ color: COLORS.gold, fontWeight: 700, fontFamily: MONO }}>{c.cluster_id}</span>
-              <span style={{ color: COLORS.textDim, fontSize: "0.8em" }}>{c.complaints} complaints · {c.distinct_victims} victims · {inr(c.total_loss)} · {c.accounts.length} accounts</span>
+              <span style={{ color: COLORS.textDim, fontSize: "0.8em" }}>{c.complaints} {c.complaints === 1 ? "complaint" : "complaints"} · {c.distinct_victims} {c.distinct_victims === 1 ? "victim" : "victims"} · {inr(c.total_loss)} · {c.accounts.length} {c.accounts.length === 1 ? "account" : "accounts"}</span>
               {c.likely_collector && (
                 <span style={{ color: COLORS.critical, fontSize: "0.8em", fontFamily: MONO }}>
                   Likely collector: {c.likely_collector.account} (fed by {c.likely_collector.fed_by_complained_accounts} complained accounts)

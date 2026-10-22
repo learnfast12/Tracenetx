@@ -364,8 +364,8 @@ function App() {
               <div className="legend">
                 {(graphData.nodes || []).some(n => n.role && n.role !== "MULE") ? (
                   <>
-                    <h3>Risk Legend</h3>
-                    {[["#FF2D2D", "Critical"], ["#FF6B00", "High Risk"], ["#FFB300", "Medium Risk"], ["#00C853", "Safe"]].map(([c, l]) => (
+                    <h3>Role Legend</h3>
+                    {[["#FF2D2D", "Criminal / Dealer"], ["#FFA000", "Recruiter"], ["#FFD600", "Hawala / Shell"], ["#FF6B00", "Crypto exit"], ["#00C853", "Mule account"]].map(([c, l]) => (
                       <div className="legend-item" key={l}><span className="dot" style={{ background: c }}></span>{l}</div>
                     ))}
                   </>
@@ -378,6 +378,10 @@ function App() {
                 <div className="legend-item"><span className="dot clear"></span>Safe</div>
                   </>
                 )}
+                <div className="legend-item" style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px solid #222", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "18px", height: "18px", borderRadius: "50%", background: "#FF2D2D", color: "#fff", fontSize: "10px", fontWeight: "bold" }}>3</span>
+                  <span style={{ color: "#FF6B6B", fontSize: "0.85em" }}>Victim complaints filed</span>
+                </div>
                 <div className="legend-item" style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px solid #222", display: "flex", alignItems: "center", gap: "8px" }}>
                   <span style={{ display: "inline-block", width: "28px", height: "0", borderTop: "2px dashed #C9A84C", verticalAlign: "middle" }}></span>
                   <span style={{ color: "#C9A84C", fontSize: "0.85em" }}>Cash Transfer</span>

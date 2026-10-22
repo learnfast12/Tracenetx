@@ -397,6 +397,18 @@ function SpiderMap({ graphData, onNodeClick, organized = true }) {
         ctx.textBaseline = "middle";
         ctx.fillText(label, p.x, p.y);
 
+        /* victim-complaint badge: red dot with the number of complaints filed against this account */
+        const cc = n.complaints || 0;
+        if (cc > 0) {
+          const bx = p.x + r * 0.78, by = p.y - r * 0.78;
+          ctx.beginPath(); ctx.arc(bx, by, 9, 0, 2 * Math.PI);
+          ctx.fillStyle = "#FF2D2D"; ctx.fill();
+          ctx.strokeStyle = "#0A0E1A"; ctx.lineWidth = 2; ctx.stroke();
+          ctx.font = "bold 10px 'IBM Plex Mono', monospace";
+          ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          ctx.fillText(String(cc), bx, by + 0.5);
+        }
+
         /* risk badge below node — only for non-mule accounts */
         if (!n.id.startsWith('ACC_')) {
           ctx.font = "bold 8px 'IBM Plex Mono', monospace";

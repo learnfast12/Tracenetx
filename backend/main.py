@@ -235,10 +235,18 @@ def filter_graph(ip: str = None, phone: str = None, city: str = None, case_id: s
     roles = assign_roles(df_full)
     structured = is_structured(roles)
 
+    try:
+        comp_accounts = complaint_engine.correlate()["accounts"]
+    except Exception:       # noqa: BLE001  (no complaints loaded -> map still renders)
+        comp_accounts = {}
+
     node_list = []
     for n in nodes:
         risk = ml_results.get(n) or calculate_risk(n)
-        node_list.append({"id": n, "risk": risk, "role": (roles.get(n, "MULE") if structured else None)})
+        direct = (comp_accounts.get(n) or {}).get("direct") or {}
+        node_list.append({"id": n, "risk": risk, "role": (roles.get(n, "MULE") if structured else None),
+                          "complaints": int(direct.get("complaints", 0)),
+                          "complaint_loss": float(direct.get("total_loss", 0.0))})
 
     return {"nodes": node_list, "edges": edges}
 

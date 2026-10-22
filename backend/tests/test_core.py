@@ -119,3 +119,9 @@ def test_renaming_accounts_does_not_change_roles_or_scores():
     s1 = {r["account_id"]: r["ml_score"] for r in ml_pipeline.predict(df)}
     s2 = {r["account_id"]: r["ml_score"] for r in ml_pipeline.predict(df2)}
     assert all(abs(s1[a] - s2[alias[a]]) < 1e-6 for a in ids)
+
+
+def test_graph_nodes_carry_complaint_counts(client):
+    nodes = {n["id"]: n for n in client.get("/graph").json()["nodes"]}
+    assert nodes["ACC_4521"]["complaints"] >= 3          # named by victims
+    assert nodes["CRIMINAL1"]["complaints"] == 0         # upstream source, never named
