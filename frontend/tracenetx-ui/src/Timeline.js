@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 const C = {
   navy: "#0A0E1A", card: "#0D1220", border: "#1A2035", accent: "#151B2E", gold: "#C9A84C",
@@ -77,9 +78,9 @@ export default function Timeline({ accountId, onClose }) {
   }, [accountId]);
 
   const fast = data ? data.pass_through.filter((p) => p.dwell_min <= 120) : [];
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(5,8,16,0.82)", zIndex: 50, overflowY: "auto", padding: 24 }}>
-      <div style={{ maxWidth: 960, margin: "0 auto", background: C.navy, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
+  return createPortal(
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(5,8,16,0.82)", zIndex: 10000, overflowY: "auto", padding: 24 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: 960, margin: "40px auto", background: C.navy, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
         <div style={{ display: "flex", alignItems: "center", marginBottom: 12 }}>
           <div style={{ color: C.gold, fontFamily: MONO, fontWeight: 700 }}>TRANSACTION TIMELINE · {accountId}</div>
           <button onClick={onClose} style={{ marginLeft: "auto", background: "transparent", color: C.gold, border: `1px solid ${C.gold}`, borderRadius: 6, padding: "4px 12px", cursor: "pointer", fontFamily: MONO }}>Close</button>
@@ -119,6 +120,7 @@ export default function Timeline({ accountId, onClose }) {
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

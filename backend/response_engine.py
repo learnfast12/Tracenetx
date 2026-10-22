@@ -37,7 +37,7 @@ class ResponseEngine:
             "ml_analysis": {
                 "shap_explanation": shap_explanation,
                 "behavioral_flags": flags,
-                "detection_method": "XGBoost + LightGBM + Random Forest ensemble + Isolation Forest anomaly detection"
+                "detection_method": "XGBoost + LightGBM + Random Forest ensemble, trained on labelled simulated networks (see /ml/model-info)"
             },
             "graph_intelligence": {
                 "reverse_chain": graph_report.get('reverse_chain', {}),

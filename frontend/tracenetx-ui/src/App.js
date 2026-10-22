@@ -268,7 +268,7 @@ function App() {
             background: "transparent", border: `1px solid ${COLORS.navyBorder}`,
             color: COLORS.textMuted, padding: "4px 12px", borderRadius: "4px",
             fontSize: "0.68em", fontFamily: "'IBM Plex Mono', monospace", letterSpacing: "1px"
-          }}>CYBERSHIELD 2026</span>
+          }}>{process.env.REACT_APP_EVENT_BADGE || "CYBER 2026"}</span>
           <span style={{
             background: "transparent", border: "1px solid #FF2D2D",
             color: "#FF2D2D", padding: "4px 12px", borderRadius: "4px",
@@ -426,7 +426,7 @@ function App() {
             <div style={{ marginBottom: "24px" }}>
               <div style={{ color: COLORS.gold, fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.7em", letterSpacing: "2px", marginBottom: "4px" }}>DETECT LAYER</div>
               <h2 style={{ color: COLORS.text, fontSize: "1.3em", fontWeight: "700", margin: 0 }}>ML Analysis</h2>
-              <p style={{ color: COLORS.textMuted, fontSize: "0.8em", margin: "6px 0 0" }}>XGBoost + LightGBM + Random Forest ensemble · Isolation Forest · SHAP explainability</p>
+              <p style={{ color: COLORS.textMuted, fontSize: "0.8em", margin: "6px 0 0" }}>XGBoost + LightGBM + Random Forest ensemble · SHAP explainability</p>
             </div>
             {mlLoading && <div className="loading">Running ML pipeline...</div>}
             {mlData && (

@@ -10,7 +10,7 @@ We measured it: tuned rules rank mules barely better than chance (AUROC ~0.6)."
 Top lead is **DEALER1**, an account **no victim ever paid**. It got there because victim money, traced forward in time, converges on it:
 ₹2.37 lakh from 26 complaints." Point at the three sub-score bars: ML, complaints, baseline. "Nothing is a black box."
 
-**1:00 — Money trail + timeline (50 s).** Click **Timeline + money trail** on DEALER1. "Money in, money out within hours — the dwell time is the signature.
+**1:00 — Money trail + timeline (50 s).** Click **Timeline + money trail** on DEALER1. "Money comes in from four feeder accounts and 99% goes onward within about 16 hours — near-zero retention is the signature of a collector.
 Red diamonds are complaints. Below: the heaviest chain from a victim-hit mule through the shell company to the dealer, with timestamps and traceable amounts."
 
 **1:50 — Why we trust it (30 s).** Open `/ml/model-info`. "The model is trained on labelled simulated rings and *scores* your data — it never learns from the data it judges.
