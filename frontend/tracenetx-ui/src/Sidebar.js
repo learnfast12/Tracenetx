@@ -42,23 +42,31 @@ function Sidebar({ selectedNode }) {
     </div>
   );
 
-  const { account, risk } = selectedNode;
+  const { account, risk, complaints } = selectedNode;
   const level = risk?.level || "LOW";
   const score = risk?.score || 0;
   const flags = risk?.flags || [];
+  const cCount = complaints?.count || 0;
+  const cVictims = complaints?.distinct_victims || 0;
+  // ML can say LOW for an account victims have reported; don't show a green "all clear" in that case
+  const mlUnderstates = cCount > 0 && (level === "LOW" || level === "CLEAR");
+  const headColor = mlUnderstates ? "#FF8C00" : riskColor(level);
+  const headBg = mlUnderstates ? "rgba(255,140,0,0.1)" : riskBg(level);
 
   return (
     <div style={{ padding: 16, overflowY: "auto", height: "100%" }}>
 
       {/* Risk Score Header */}
       <div style={{
-        background: riskBg(level),
-        border: `1px solid ${riskColor(level)}`,
+        background: headBg,
+        border: `1px solid ${headColor}`,
         borderRadius: 12, padding: 16, marginBottom: 16,
         textAlign: "center"
       }}>
-        <div style={{ color: riskColor(level), fontSize: 11, fontWeight: "bold", letterSpacing: 1, marginBottom: 8 }}>
-          {level === "CRITICAL" ? "🚨" : level === "HIGH" ? "🔴" : level === "MEDIUM" ? "⚠️" : "✅"} {level === "CLEAR" ? "SAFE" : level + " RISK"}
+        <div style={{ color: headColor, fontSize: 11, fontWeight: "bold", letterSpacing: 1, marginBottom: 8 }}>
+          {mlUnderstates
+            ? `⚠️ ${level} ML RISK · COMPLAINT-FLAGGED`
+            : `${level === "CRITICAL" ? "🚨" : level === "HIGH" ? "🔴" : level === "MEDIUM" ? "⚠️" : "✅"} ${level === "CLEAR" ? "SAFE" : level + " RISK"}`}
         </div>
         <div style={{ color: "#e6edf3", fontSize: 22, fontWeight: "bold", marginBottom: 8 }}>
           {account?.id}
@@ -74,10 +82,36 @@ function Sidebar({ selectedNode }) {
             transition: "width 1s ease"
           }} />
         </div>
-        <div style={{ color: riskColor(level), fontSize: 13, fontWeight: "bold" }}>
-          {score}/100
+        <div style={{ color: headColor, fontSize: 13, fontWeight: "bold" }}>
+          {score}/100 <span style={{ color: "#8b949e", fontSize: 10, fontWeight: "normal" }}>ML score</span>
         </div>
       </div>
+
+      {/* Victim complaints */}
+      {cCount > 0 && (
+        <div style={{
+          marginBottom: 16, background: "rgba(255,45,45,0.08)",
+          border: "1px solid rgba(255,45,45,0.4)", borderLeft: "3px solid #FF2D2D",
+          borderRadius: "0 10px 10px 0", padding: "10px 14px"
+        }}>
+          <div style={{ color: "#FF6B6B", fontSize: 11, fontWeight: "bold", letterSpacing: 1, marginBottom: 6, textTransform: "uppercase" }}>
+            🚨 Victim complaints
+          </div>
+          <div style={{ color: "#e6edf3", fontSize: 13 }}>
+            {cCount} {cCount === 1 ? "complaint" : "complaints"} · {cVictims} {cVictims === 1 ? "victim" : "victims"} · {fmt(complaints.total_loss || 0)} reported lost
+          </div>
+          {(complaints.fraud_types || []).length > 0 && (
+            <div style={{ color: "#8b949e", fontSize: 11, marginTop: 4 }}>
+              {complaints.fraud_types.join(", ")}
+            </div>
+          )}
+          {mlUnderstates && (
+            <div style={{ color: "#ffa07a", fontSize: 11, marginTop: 6 }}>
+              ML score alone understates this account. Victims have reported it directly.
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Money Summary */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>

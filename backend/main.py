@@ -168,6 +168,23 @@ def get_graph(case_id: str = None):
     # switches and required a separately-running Neo4j server.
     return filter_graph(case_id=case_id)
 
+def complaint_block(account_id: str) -> dict:
+    """Victim-complaint evidence for the side panel, so it agrees with the red badge on the map
+    (ML risk alone can say LOW for an account victims have actually reported)."""
+    try:
+        view = complaint_engine.account_view(account_id)
+        direct = view.get("direct") or {}
+        return {
+            "count": int(direct.get("complaints", 0)),
+            "distinct_victims": int(direct.get("distinct_victims", 0)),
+            "total_loss": float(direct.get("total_loss", 0.0)),
+            "fraud_types": direct.get("fraud_types", []),
+            "complaint_score": float(view.get("complaint_score", 0) or 0),
+        }
+    except Exception:       # noqa: BLE001  (no complaints loaded -> panel just omits the card)
+        return {"count": 0, "distinct_victims": 0, "total_loss": 0.0, "fraud_types": [], "complaint_score": 0.0}
+
+
 @app.get("/account/{account_id}")
 def get_account(account_id: str):
     details = get_account_details(account_id)
@@ -193,7 +210,7 @@ def get_account(account_id: str):
     elif len(as_receiver) > 0:
         own_ip = as_receiver.iloc[0]["receiver_ip"]
     details["own_ip"] = own_ip
-    return {"account": details, "risk": risk}
+    return {"account": details, "risk": risk, "complaints": complaint_block(account_id)}
 
 @app.get("/filter")
 def filter_graph(ip: str = None, phone: str = None, city: str = None, case_id: str = None):

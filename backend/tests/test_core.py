@@ -125,3 +125,13 @@ def test_graph_nodes_carry_complaint_counts(client):
     nodes = {n["id"]: n for n in client.get("/graph").json()["nodes"]}
     assert nodes["ACC_4521"]["complaints"] >= 3          # named by victims
     assert nodes["CRIMINAL1"]["complaints"] == 0         # upstream source, never named
+
+
+def test_account_panel_carries_complaints(client):
+    # tests the helper directly: /account/{id} itself needs Neo4j
+    import main
+    named = main.complaint_block("ACC_4521")
+    assert named["count"] >= 3
+    assert named["distinct_victims"] >= 1
+    assert main.complaint_block("CRIMINAL1")["count"] == 0
+    assert main.complaint_block("NO_SUCH_ACCOUNT")["count"] == 0
