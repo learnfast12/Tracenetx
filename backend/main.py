@@ -35,6 +35,8 @@ app.include_router(complaints_router)
 app.include_router(investigation_router)
 app.include_router(timeline_router)
 app.include_router(report_router)
+from soa_api import router as soa_router  # noqa: E402
+app.include_router(soa_router)
 
 
 @app.get("/ml/model-info")

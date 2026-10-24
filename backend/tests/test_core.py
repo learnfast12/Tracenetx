@@ -127,6 +127,33 @@ def test_graph_nodes_carry_complaint_counts(client):
     assert nodes["CRIMINAL1"]["complaints"] == 0         # upstream source, never named
 
 
+def test_soa_endpoints_degrade_without_data(client, monkeypatch, tmp_path):
+    monkeypatch.setenv("SOA_DIR", str(tmp_path / "nope"))
+    j = client.get("/soa/ranked").json()
+    assert j["available"] is False and j["holders"] == []
+    assert client.get("/soa/holder/H_X").status_code == 404
+
+
+def test_soa_ranking_and_holder_detail(client, monkeypatch, tmp_path):
+    import soa_score
+    edges = pd.DataFrame([
+        {"sender_id": "H_A", "receiver_id": "CP1", "amount": 5000, "timestamp": "2024-01-01 10:00:00", "transfer_type": "UPI", "case_id": "x", "source_file": 1},
+        {"sender_id": "CP2", "receiver_id": "H_A", "amount": 5000, "timestamp": "2024-01-01 09:00:00", "transfer_type": "UPI", "case_id": "x", "source_file": 1},
+        {"sender_id": "CP1", "receiver_id": "H_B", "amount": 700, "timestamp": "2024-01-02 09:00:00", "transfer_type": "IMPS", "case_id": "x", "source_file": 2},
+    ])
+    flows = pd.DataFrame(columns=["holder_id", "debit", "credit", "timestamp", "channel", "source_file"])
+    edges.to_csv(tmp_path / "soa_edges.csv", index=False)
+    flows.to_csv(tmp_path / "soa_holder_flows.csv", index=False)
+    soa_score.main(str(tmp_path), 5)                      # writes soa_ranked.csv
+    monkeypatch.setenv("SOA_DIR", str(tmp_path))
+    r = client.get("/soa/ranked").json()
+    assert r["available"] and {h["holder"] for h in r["holders"]} == {"H_A", "H_B"}
+    d = client.get("/soa/holder/H_A").json()
+    assert d["total_in"] == 5000 and d["total_out"] == 5000
+    assert d["shares_counterparties_with"] == {"H_B": 1}   # both touch CP1
+    assert client.get("/soa/holder/NOPE").status_code == 404
+
+
 def test_account_panel_carries_complaints(client):
     # tests the helper directly: /account/{id} itself needs Neo4j
     import main

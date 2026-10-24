@@ -7,6 +7,7 @@ import Dashboard from "./Dashboard";
 import CityMap from "./CityMap";
 import Dataset from "./Dataset";
 import Investigation from "./Investigation";
+import SoaRanking from "./SoaRanking";
 import "./App.css";
 
 const COLORS = {
@@ -311,6 +312,7 @@ function App() {
             ["intelligence", "🧠 Intelligence"],
             ["temporal", "⏱ Temporal"],
             ["investigation", "🎯 Investigation"],
+            ["soa", "🏦 Mule Ranking"],
             // ["validation", "🔬 Model Validation"], // hidden post-BOI, re-enable if needed
             ["dataset", "📁 Dataset"],
             ["dashboard", "📊 Dashboard"],
@@ -918,6 +920,7 @@ function App() {
         )}
 
         {activeTab === "investigation" && <Investigation refreshKey={dataVersion} onOpenEvidence={(id) => { fetchEvidence(id); setActiveTab("evidence"); }} />}
+        {activeTab === "soa" && <div style={{ flex: 1, overflowY: "auto" }}><SoaRanking /></div>}
         {activeTab === "dataset" && <Dataset onViewMLAnalysis={() => handleTabSwitch("ml")} onDatasetActivated={handleDatasetActivated} />}
         {activeTab === "dashboard" && <div style={{ flex: 1, overflowY: "auto" }}><Dashboard key={dataVersion} /></div>}
         {activeTab === "citymap" && <div style={{ flex: 1 }}><CityMap key={activeDatasetId} graphData={graphData} onCityClick={(city) => {
