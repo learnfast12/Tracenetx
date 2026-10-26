@@ -15,6 +15,7 @@ import os
 import pandas as pd
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 
 from soa_score import WEIGHTS, unify
 
@@ -24,6 +25,7 @@ _CACHE = {}
 LABELS = {"passthrough": "Pass-through", "fast_dwell": "Fast turnaround", "fan": "Counterparty spread",
           "burst": "Bursts", "round": "Round amounts", "shared": "Shared counterparties"}
 FLAG_THRESHOLD = 60.0
+DISPOSITIONS = ("ESCALATE", "MONITOR", "CLEARED")
 PASS_WINDOW_HOURS = 6
 
 
@@ -153,7 +155,9 @@ def _holder_detail(c, holder_id: str) -> dict:
         t = (cp.assign(is_in=(cp.dir == "IN").astype(int))
                .groupby("cp").agg(volume=("amount", "sum"), txns=("amount", "size"), in_=("is_in", "sum"))
                .sort_values("volume", ascending=False).head(10))
+        nh = u[u.cp.isin(t.index)].groupby("cp").holder.nunique()
         top = [{"counterparty": str(k), "volume": round(float(v.volume)), "txns": int(v.txns),
+                "holders": int(nh.get(k, 1)),
                 "direction": "mostly in" if v.in_ * 2 > v.txns else "mostly out"} for k, v in t.iterrows()]
 
     # other holders that transact with the same counterparties
@@ -212,6 +216,49 @@ def _holder_detail(c, holder_id: str) -> dict:
             "timestamps_usable": bool(len(dated) > 10)}
 
 
+def _verdict_path() -> str:
+    return os.path.join(_dir(), "soa_verdicts.json")
+
+
+def _verdicts() -> dict:
+    try:
+        with open(_verdict_path()) as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return {}
+
+
+class Verdict(BaseModel):
+    disposition: str
+    note: str = ""
+
+
+@router.get("/soa/verdicts")
+def soa_verdicts():
+    """Investigator dispositions (these are the labels a supervised model would later train on)."""
+    return _verdicts()
+
+
+@router.post("/soa/verdict/{holder_id}")
+def soa_set_verdict(holder_id: str, v: Verdict):
+    c = _need()
+    if holder_id not in set(c["ranked"].holder):
+        raise HTTPException(404, "Unknown holder")
+    disp = v.disposition.upper()
+    if disp not in DISPOSITIONS and disp != "OPEN":
+        raise HTTPException(400, f"disposition must be one of {DISPOSITIONS} or OPEN")
+    data = _verdicts()
+    if disp == "OPEN":
+        data.pop(holder_id, None)
+    else:
+        data[holder_id] = {"disposition": disp, "note": v.note[:500],
+                           "at": pd.Timestamp.now("UTC").strftime("%Y-%m-%d %H:%M UTC")}
+    os.makedirs(_dir(), exist_ok=True)
+    with open(_verdict_path(), "w") as fh:
+        json.dump(data, fh, indent=1)
+    return {"ok": True, "verdicts": data}
+
+
 @router.get("/soa/holder/{holder_id}")
 def soa_holder(holder_id: str):
     return _holder_detail(_need(), holder_id)
@@ -231,6 +278,7 @@ def soa_report(holder_id: str):
     cps = rows([(t["counterparty"], _cr(t["volume"]), t["txns"], t["direction"]) for t in d["top_counterparties"]], 4)
     pas = rows([(p["in_ts"], _cr(p["in_amt"]), p["out_ts"], _cr(p["out_amt"]), f"{p['hours']} h")
                 for p in d["pass_through"]["events"]], 5)
+    vd = _verdicts().get(holder_id)
     linked = "".join(f"<li>{e(k)}: {v:,} shared counterparties</li>" for k, v in d["shares_counterparties_with"].items())
     share = d["pass_through"]["share_of_credits"]
     caveats = []
@@ -250,6 +298,7 @@ table{{border-collapse:collapse;width:100%;font-size:14px}} th,td{{text-align:le
 </style></head><body>
 <p class="noprint meta">Use your browser's Print &rarr; Save as PDF.</p>
 <h1>Case report: {e(holder_id)}</h1>
+<p class="meta">Case no. TNX-PS01-{e(holder_id.replace('H_', ''))} &middot; Generated {pd.Timestamp.now('UTC').strftime('%Y-%m-%d %H:%M UTC')} &middot; Status: <b>{e(vd['disposition']) if vd else 'OPEN (no investigator decision yet)'}</b>{(' &middot; Note: ' + e(vd['note'])) if vd and vd.get('note') else ''}</p>
 <p class="meta">TraceNetX &middot; PS-01 &middot; Rank #{d['rank']} of {len(_need()['ranked'])} statement holders &middot; holder identity is hashed</p>
 <div class="box"><span class="score">{d['risk_score']}</span> / 100 relative risk<br>{e(str(d['reasons']))}</div>
 <h2>Activity</h2>
@@ -259,6 +308,7 @@ table{{border-collapse:collapse;width:100%;font-size:14px}} th,td{{text-align:le
 <h2>Top counterparties</h2><table><tr><th>Account</th><th>Volume</th><th>Txns</th><th>Direction</th></tr>{cps or '<tr><td colspan=4>No counterparty column in this statement.</td></tr>'}</table>
 <h2>Fastest pass-through events</h2><table><tr><th>Credit time</th><th>Credit</th><th>Debit time</th><th>Debit</th><th>Gap</th></tr>{pas or '<tr><td colspan=5>None found, or timestamps unusable.</td></tr>'}</table>
 {'<h2>Linked holders</h2><ul>' + linked + '</ul>' if linked else ''}
+<h2>Investigator sign-off</h2><table><tr><td style="height:48px">Name / designation:</td><td>Signature &amp; date:</td></tr></table>
 <h2>Read this first</h2><ul>{''.join(f'<li>{e(c)}</li>' for c in caveats)}</ul>
 </body></html>"""
     return HTMLResponse(page)

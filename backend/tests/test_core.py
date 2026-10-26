@@ -156,8 +156,12 @@ def test_soa_ranking_and_holder_detail(client, monkeypatch, tmp_path):
     assert any(c["points"] is None for c in d["contributions"]) or d["contributions"]
     ov = client.get("/soa/overview").json()
     assert ov["holders"] == 2 and ov["transactions"] == 3
+    v = client.post("/soa/verdict/H_A", json={"disposition": "escalate", "note": "pass-through"})
+    assert v.status_code == 200 and client.get("/soa/verdicts").json()["H_A"]["disposition"] == "ESCALATE"
+    assert client.post("/soa/verdict/H_A", json={"disposition": "bogus"}).status_code == 400
+    assert client.post("/soa/verdict/NOPE", json={"disposition": "CLEARED"}).status_code == 404
     rep = client.get("/soa/report/H_A")
-    assert rep.status_code == 200 and "H_A" in rep.text
+    assert rep.status_code == 200 and "H_A" in rep.text and "ESCALATE" in rep.text
     assert client.get("/soa/report/NOPE").status_code == 404
 
 

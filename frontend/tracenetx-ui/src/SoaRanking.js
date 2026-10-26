@@ -14,6 +14,11 @@ const SIGNAL_COLOR = {
 const inr = (n) => `₹${Math.round(n || 0).toLocaleString("en-IN")}`;
 const short = (n) => (n >= 1e7 ? `₹${(n / 1e7).toFixed(1)} Cr` : n >= 1e5 ? `₹${(n / 1e5).toFixed(1)} L` : inr(n));
 const scoreColor = (s) => (s >= 65 ? C.crit : s >= 55 ? C.high : s >= 45 ? C.med : C.low);
+const mask = (id) => { const t = String(id); return t.length > 6 ? `${"•".repeat(Math.min(t.length - 4, 8))}${t.slice(-4)}` : t; };
+const DISP = { ESCALATE: { c: C.crit, label: "Escalate" }, MONITOR: { c: C.med, label: "Monitor" }, CLEARED: { c: C.low, label: "Cleared" } };
+const Chip = ({ d }) => d ? (
+  <span style={{ border: `1px solid ${DISP[d.disposition].c}`, color: DISP[d.disposition].c, borderRadius: 10, padding: "1px 8px", fontSize: "0.85em" }}>{DISP[d.disposition].label}</span>
+) : <span style={{ color: C.muted }}>Open</span>;
 const tail = (id) => (String(id).length > 6 ? `…${String(id).slice(-4)}` : String(id));
 
 const Kpi = ({ label, value, sub, color }) => (
@@ -112,7 +117,9 @@ function Network({ net }) {
   );
 }
 
-function Detail({ id, fallback }) {
+function Detail({ id, fallback, verdict, onVerdict }) {
+  const [note, setNote] = useState("");
+  useEffect(() => setNote((verdict && verdict.note) || ""), [id, verdict]);
   const [d, setD] = useState(null);
   useEffect(() => {
     setD(null);
@@ -124,6 +131,18 @@ function Detail({ id, fallback }) {
   const sharedKeys = Object.keys(d.shares_counterparties_with || {});
   return (
     <div style={{ padding: 16, background: C.accent, borderTop: `1px solid ${C.border}`, display: "grid", gridTemplateColumns: "1.05fr 1fr", gap: 20 }}>
+      <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 12px", fontFamily: MONO, fontSize: "0.72em" }}>
+        <span style={{ color: C.gold, letterSpacing: 1 }}>INVESTIGATOR DECISION</span>
+        {Object.keys(DISP).map((k) => (
+          <button key={k} onClick={() => onVerdict(id, k, note)} style={{
+            background: verdict && verdict.disposition === k ? DISP[k].c : "transparent", color: verdict && verdict.disposition === k ? "#0A0E1A" : DISP[k].c,
+            border: `1px solid ${DISP[k].c}`, borderRadius: 6, padding: "5px 12px", cursor: "pointer", fontFamily: MONO, fontWeight: 700 }}>{DISP[k].label}</button>
+        ))}
+        <input value={note} onChange={(e) => setNote(e.target.value)} onBlur={() => verdict && onVerdict(id, verdict.disposition, note)} placeholder="Reason / note (saved with the decision)"
+               style={{ flex: 1, minWidth: 200, background: "#0A0F1C", color: C.text, border: `1px solid ${C.border}`, borderRadius: 6, padding: "6px 10px", fontFamily: MONO, fontSize: "1em" }} />
+        {verdict && <button onClick={() => onVerdict(id, "OPEN", "")} style={{ background: "transparent", color: C.muted, border: "none", cursor: "pointer", fontFamily: MONO }}>reset</button>}
+        {verdict && <span style={{ color: C.muted }}>{verdict.at}</span>}
+      </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         <div>
           <SectionTitle>Why this score</SectionTitle>
@@ -156,10 +175,10 @@ function Detail({ id, fallback }) {
         <div>
           <SectionTitle>Monthly money in vs out</SectionTitle>
           {d.timestamps_usable && d.monthly.length > 0 ? (
-            <ResponsiveContainer width="100%" height={170}>
-              <BarChart data={d.monthly}>
-                <XAxis dataKey="month" tick={{ fill: C.muted, fontSize: 9 }} interval="preserveStartEnd" />
-                <YAxis tick={{ fill: C.muted, fontSize: 9 }} tickFormatter={short} width={60} />
+            <ResponsiveContainer width="100%" height={190}>
+              <BarChart data={d.monthly} margin={{ top: 14, right: 8, left: 0, bottom: 0 }}>
+                <XAxis dataKey="month" tick={{ fill: C.muted, fontSize: 9 }} interval={Math.max(0, Math.ceil(d.monthly.length / 8) - 1)} />
+                <YAxis tick={{ fill: C.muted, fontSize: 9 }} tickFormatter={short} width={64} domain={[0, "auto"]} />
                 <Tooltip formatter={(v) => inr(v)} contentStyle={{ background: "#161b22", border: `1px solid ${C.border}` }} />
                 <Legend wrapperStyle={{ fontFamily: MONO, fontSize: 11 }} />
                 <Bar dataKey="in" fill={C.inColor} name="Money in" />
@@ -194,10 +213,11 @@ function Detail({ id, fallback }) {
           </div>
         )}
         <div>
-          <SectionTitle>Top counterparties</SectionTitle>
+          <SectionTitle>Top counterparties <span style={{ color: C.muted, textTransform: "none", letterSpacing: 0 }}>(account numbers masked)</span></SectionTitle>
           {d.top_counterparties.slice(0, 5).map((c) => (
             <div key={c.counterparty} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontFamily: MONO, fontSize: "0.7em", color: C.dim }}>
-              <span>{c.counterparty}</span><span style={{ color: C.text }}>{short(c.volume)} · {c.txns}× · {c.direction}</span>
+              <span title={c.counterparty}>{mask(c.counterparty)}{c.holders > 1 && <span style={{ color: C.high }}> · used by {c.holders} holders</span>}</span>
+              <span style={{ color: C.text }}>{short(c.volume)} · {c.txns} txn{c.txns === 1 ? "" : "s"} · {c.direction}</span>
             </div>
           ))}
           {d.top_counterparties.length === 0 && <div style={{ color: C.muted, fontSize: "0.72em", fontFamily: MONO }}>None (no counterparty column).</div>}
@@ -211,14 +231,35 @@ function Detail({ id, fallback }) {
   );
 }
 
-export default function SoaRanking() {
+export default function SoaRanking({ onStats }) {
   const [data, setData] = useState(null);
   const [ov, setOv] = useState(null);
   const [open, setOpen] = useState(null);
+  const [verdicts, setVerdicts] = useState({});
+  const [q, setQ] = useState("");
+  const [fv, setFv] = useState("ALL");
   useEffect(() => {
     fetch(`${API}/soa/ranked`).then((r) => r.json()).then(setData).catch(() => setData({ available: false, holders: [], hint: "Backend not reachable." }));
-    fetch(`${API}/soa/overview`).then((r) => r.json()).then(setOv).catch(() => {});
+    fetch(`${API}/soa/overview`).then((r) => r.json()).then((o) => { setOv(o); if (onStats) onStats(o); }).catch(() => {});
+    fetch(`${API}/soa/verdicts`).then((r) => r.json()).then(setVerdicts).catch(() => {});
+    return () => { if (onStats) onStats(null); };
+    // eslint-disable-next-line
   }, []);
+  const setVerdict = async (id, disposition, note) => {
+    try {
+      const r = await fetch(`${API}/soa/verdict/${encodeURIComponent(id)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ disposition, note }) });
+      if (r.ok) setVerdicts((await r.json()).verdicts);
+    } catch (e) { /* offline: leave as is */ }
+  };
+  const exportVerdicts = () => {
+    const rows = [["holder", "disposition", "note", "decided_at", "risk_score"]].concat(Object.entries(verdicts).map(([k, v]) => {
+      const h = (data.holders.find((x) => x.holder === k) || {});
+      return [k, v.disposition, `"${(v.note || "").replace(/"/g, '""')}"`, v.at, h.risk_score];
+    }));
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([rows.map((r) => r.join(",")).join("\n")], { type: "text/csv" }));
+    a.download = "investigator_decisions.csv"; a.click();
+  };
   if (!data) return <div style={{ padding: 24, color: C.muted, fontFamily: MONO }}>Loading ranking…</div>;
   if (!data.available) {
     return (
@@ -227,6 +268,10 @@ export default function SoaRanking() {
       </div>
     );
   }
+  const reviewed = Object.keys(verdicts).length;
+  const shown = data.holders.map((h, i) => ({ ...h, rank: i + 1 })).filter((h) =>
+    (!q || h.holder.toLowerCase().includes(q.toLowerCase()) || String(h.reasons).toLowerCase().includes(q.toLowerCase())) &&
+    (fv === "ALL" || (fv === "OPEN" ? !verdicts[h.holder] : verdicts[h.holder] && verdicts[h.holder].disposition === fv)));
   return (
     <div style={{ padding: 24, maxWidth: 1300, margin: "0 auto" }}>
       <div style={{ color: C.gold, fontFamily: MONO, fontSize: "1.1em", fontWeight: 700 }}>Mule-risk investigation workspace · C-DAC statements</div>
@@ -241,7 +286,8 @@ export default function SoaRanking() {
             <Kpi label="Statement holders" value={ov.holders} sub={`${ov.behaviour_only_holders} behaviour-only`} />
             <Kpi label="Transactions" value={ov.transactions.toLocaleString("en-IN")} sub={`${ov.counterparties.toLocaleString("en-IN")} counterparties`} />
             <Kpi label="Value transacted" value={short(ov.volume)} />
-            <Kpi label={`Flagged (score ≥ ${ov.flag_threshold})`} value={ov.flagged} color={C.crit} sub="of the holders above" />
+            <Kpi label="Priority tier" value={ov.flagged} color={C.crit} sub={`score ≥ ${ov.flag_threshold} · relative rank, not a verdict`} />
+            <Kpi label="Reviewed" value={`${reviewed} / ${ov.holders}`} color={C.low} sub="investigator decisions" />
             <Kpi label="Usable timestamps" value={`${ov.timestamps_usable_pct}%`} color={ov.timestamps_usable_pct < 90 ? C.med : C.low} sub={ov.source_files ? `${ov.source_files} files · ${ov.layouts || "?"} formats` : null} />
           </div>
           {ov.linked_pairs.length > 0 && (
@@ -252,17 +298,27 @@ export default function SoaRanking() {
         </>
       )}
 
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", margin: "0 0 10px", fontFamily: MONO, fontSize: "0.72em" }}>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search holder or signal…"
+               style={{ background: C.card, color: C.text, border: `1px solid ${C.border}`, borderRadius: 6, padding: "7px 10px", fontFamily: MONO, width: 240 }} />
+        {["ALL", "OPEN", "ESCALATE", "MONITOR", "CLEARED"].map((k) => (
+          <button key={k} onClick={() => setFv(k)} style={{ background: fv === k ? "#C9A84C22" : "transparent", color: fv === k ? C.gold : C.muted,
+            border: `1px solid ${fv === k ? C.gold : C.border}`, borderRadius: 14, padding: "4px 12px", cursor: "pointer", fontFamily: MONO }}>{k === "ALL" ? "All" : k[0] + k.slice(1).toLowerCase()}</button>
+        ))}
+        <span style={{ marginLeft: "auto", color: C.muted }}>{shown.length} of {data.holders.length} shown</span>
+        <button onClick={exportVerdicts} disabled={!reviewed} style={{ background: "transparent", color: reviewed ? C.gold : C.muted, border: `1px solid ${C.border}`, borderRadius: 6, padding: "5px 10px", cursor: reviewed ? "pointer" : "default", fontFamily: MONO }}>⬇ Export decisions CSV</button>
+      </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, margin: "0 0 10px", fontFamily: MONO, fontSize: "0.62em", color: C.muted }}>
         {data.holders[0] && data.holders[0].contributions.map((c) => (
           <span key={c.key}><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: SIGNAL_COLOR[c.key], marginRight: 5 }} />{c.label}</span>
         ))}
       </div>
 
-      {data.holders.map((h, i) => (
+      {shown.map((h) => (
         <div key={h.holder} style={{ background: C.card, border: `1px solid ${open === h.holder ? C.gold : C.border}`, borderRadius: 8, marginBottom: 8, overflow: "hidden" }}>
           <div onClick={() => setOpen(open === h.holder ? null : h.holder)}
-               style={{ display: "grid", gridTemplateColumns: "34px 110px 1fr 120px 120px", gap: 12, alignItems: "center", padding: "10px 14px", cursor: "pointer", fontFamily: MONO, fontSize: "0.75em" }}>
-            <span style={{ color: C.muted }}>#{i + 1}</span>
+               style={{ display: "grid", gridTemplateColumns: "34px 110px 1fr 110px 110px 70px", gap: 12, alignItems: "center", padding: "10px 14px", cursor: "pointer", fontFamily: MONO, fontSize: "0.75em" }}>
+            <span style={{ color: C.muted }}>#{h.rank}</span>
             <span style={{ color: C.text, fontWeight: 700 }}>{h.holder}</span>
             <span>
               <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -275,8 +331,9 @@ export default function SoaRanking() {
             </span>
             <span style={{ color: C.dim }}>in {short(h.total_in)}</span>
             <span style={{ color: C.dim }}>out {short(h.total_out)}</span>
+            <span style={{ textAlign: "right" }}><Chip d={verdicts[h.holder]} /></span>
           </div>
-          {open === h.holder && <Detail id={h.holder} fallback={h.contributions} />}
+          {open === h.holder && <Detail id={h.holder} fallback={h.contributions} verdict={verdicts[h.holder]} onVerdict={setVerdict} />}
         </div>
       ))}
     </div>

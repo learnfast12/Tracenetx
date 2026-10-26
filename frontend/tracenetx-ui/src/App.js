@@ -86,6 +86,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [organizedLayout, setOrganizedLayout] = useState(true);
   const [activeTab, setActiveTab] = useState("map");
+  const [soaStats, setSoaStats] = useState(null);   // real-data KPIs, shown in the header only on the Mule Ranking tab
   const [exporting, setExporting] = useState(false);
   const [mlData, setMlData] = useState(null);
   const [mlLoading, setMlLoading] = useState(false);
@@ -288,13 +289,19 @@ function App() {
         gap: "0",
         height: "48px",
       }}>
-        {[
+        {(activeTab === "soa" && soaStats && soaStats.available ? [
+          { label: "Statement Holders", value: soaStats.holders, color: COLORS.text },
+          { label: "Transactions", value: soaStats.transactions.toLocaleString("en-IN"), color: COLORS.text },
+          { label: "Priority Tier", value: soaStats.flagged, color: COLORS.critical },
+          { label: "Linked Pairs", value: (soaStats.linked_pairs || []).length, color: COLORS.medium },
+          { label: "Value", value: `₹${(soaStats.volume / 1e7).toFixed(1)} Cr`, color: COLORS.gold },
+        ] : [
           { label: "Total Accounts", value: graphData.nodes.length, color: COLORS.text },
           { label: "Transactions", value: graphData.edges.length, color: COLORS.text },
           { label: "Flagged", value: (graphData.nodes || []).filter(n => n.risk && (n.risk.level === "HIGH" || n.risk.level === "CRITICAL")).length, color: COLORS.critical },
           { label: "Medium Risk", value: medRiskCount, color: COLORS.medium },
           { label: "Total Amount", value: `₹${(totalAmount / 100000).toFixed(1)}L`, color: COLORS.gold },
-        ].map((s, i) => (
+        ]).map((s, i) => (
           <div key={i} style={{
             padding: "0 20px",
             borderRight: `1px solid ${COLORS.navyBorder}`,
@@ -920,7 +927,7 @@ function App() {
         )}
 
         {activeTab === "investigation" && <Investigation refreshKey={dataVersion} onOpenEvidence={(id) => { fetchEvidence(id); setActiveTab("evidence"); }} />}
-        {activeTab === "soa" && <div style={{ flex: 1, overflowY: "auto" }}><SoaRanking /></div>}
+        {activeTab === "soa" && <div style={{ flex: 1, overflowY: "auto" }}><SoaRanking onStats={setSoaStats} /></div>}
         {activeTab === "dataset" && <Dataset onViewMLAnalysis={() => handleTabSwitch("ml")} onDatasetActivated={handleDatasetActivated} />}
         {activeTab === "dashboard" && <div style={{ flex: 1, overflowY: "auto" }}><Dashboard key={dataVersion} /></div>}
         {activeTab === "citymap" && <div style={{ flex: 1 }}><CityMap key={activeDatasetId} graphData={graphData} onCityClick={(city) => {

@@ -11,6 +11,19 @@ const MONO = "'IBM Plex Mono', monospace";
 const tierColor = (t) => ({ CRITICAL: COLORS.critical, HIGH: COLORS.high, MEDIUM: COLORS.medium }[t] || COLORS.low);
 const inr = (n) => `₹${Math.round(n || 0).toLocaleString("en-IN")}`;
 
+const Ring = ({ score, color }) => {
+  const r = 20, c = 2 * Math.PI * r, f = Math.min(score, 100) / 100;
+  return (
+    <svg width="54" height="54" viewBox="0 0 54 54" role="img" aria-label={`Priority score ${score}`}>
+      <circle cx="27" cy="27" r={r} fill="none" stroke={COLORS.navyAccent} strokeWidth="5" />
+      <circle cx="27" cy="27" r={r} fill="none" stroke={color} strokeWidth="5" strokeLinecap="round"
+              strokeDasharray={`${c * f} ${c}`} transform="rotate(-90 27 27)" />
+      <text x="27" y="31" textAnchor="middle" fill={COLORS.text} fontSize="12" fontWeight="700" fontFamily="monospace">{Math.round(score)}</text>
+    </svg>
+  );
+};
+const SUB = { ml: "ML risk", complaints: "Complaints", baseline: "Baseline deviation" };
+
 const Stat = ({ label, value, color }) => (
   <div style={{ background: COLORS.navyCard, border: `1px solid ${COLORS.navyBorder}`, borderRadius: 8, padding: "12px 16px", minWidth: 150 }}>
     <div style={{ color: COLORS.textMuted, fontSize: "0.65em", letterSpacing: 1, textTransform: "uppercase", fontFamily: MONO }}>{label}</div>
@@ -34,6 +47,8 @@ function Investigation({ onOpenEvidence, refreshKey }) {
   const [uploading, setUploading] = useState(false);
   const [timelineFor, setTimelineFor] = useState(null);
   const fileRef = useRef(null);
+  const [tier, setTier] = useState("ALL");
+  const [q, setQ] = useState("");
 
   const load = async () => {
     try {
@@ -62,6 +77,11 @@ function Investigation({ onOpenEvidence, refreshKey }) {
   if (!data) return <div style={{ padding: 24, color: COLORS.textMuted, fontFamily: MONO }}>Correlating complaints with the transaction graph…</div>;
 
   const s = data.complaint_stats || {};
+  const tiers = ["CRITICAL", "HIGH", "MEDIUM"];
+  const count = (t) => data.leads.filter((l) => l.priority_tier === t).length;
+  const leads = data.leads.map((l, i) => ({ ...l, rank: i + 1 })).filter((l) =>
+    (tier === "ALL" || l.priority_tier === tier) &&
+    (!q || `${l.account_id} ${l.role}`.toLowerCase().includes(q.toLowerCase())));
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: 24, background: COLORS.navy }}>
       {timelineFor && <Timeline accountId={timelineFor} onClose={() => setTimelineFor(null)} />}
@@ -90,15 +110,33 @@ function Investigation({ onOpenEvidence, refreshKey }) {
         <Stat label="Funds-consistent" value={`${Math.round((s.funds_consistent_share || 0) * 100)}%`} color={COLORS.low} />
       </div>
 
-      <div style={{ color: COLORS.textDim, fontSize: "0.7em", letterSpacing: 1, fontFamily: MONO, marginBottom: 8 }}>TOP INVESTIGATIVE LEADS</div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12, fontFamily: MONO, fontSize: "0.72em" }}>
+        <span style={{ color: COLORS.textDim, letterSpacing: 1, marginRight: 4 }}>TOP INVESTIGATIVE LEADS</span>
+        {["ALL", ...tiers].map((t) => (
+          <button key={t} onClick={() => setTier(t)} style={{
+            background: tier === t ? `${t === "ALL" ? COLORS.gold : tierColor(t)}22` : "transparent",
+            color: tier === t ? (t === "ALL" ? COLORS.gold : tierColor(t)) : COLORS.textMuted,
+            border: `1px solid ${tier === t ? (t === "ALL" ? COLORS.gold : tierColor(t)) : COLORS.navyBorder}`,
+            borderRadius: 14, padding: "4px 12px", cursor: "pointer", fontFamily: MONO,
+          }}>{t === "ALL" ? `All ${data.leads.length}` : `${t[0] + t.slice(1).toLowerCase()} ${count(t)}`}</button>
+        ))}
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search account or role…" style={{
+          marginLeft: "auto", background: COLORS.navyCard, color: COLORS.text, border: `1px solid ${COLORS.navyBorder}`,
+          borderRadius: 6, padding: "6px 10px", fontFamily: MONO, width: 220 }} />
+      </div>
+      {leads.length === 0 && <div style={{ color: COLORS.textMuted, fontFamily: MONO, fontSize: "0.8em", marginBottom: 20 }}>No leads match this filter.</div>}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(420px, 1fr))", gap: 12, marginBottom: 24 }}>
-        {data.leads.map((l, i) => (
+        {leads.map((l) => (
           <div key={l.account_id} style={{ background: COLORS.navyCard, border: `1px solid ${COLORS.navyBorder}`, borderLeft: `3px solid ${tierColor(l.priority_tier)}`, borderRadius: 8, padding: 14 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ color: COLORS.textMuted, fontFamily: MONO, fontSize: "0.8em" }}>#{i + 1}</span>
+              <Ring score={l.priority_score} color={tierColor(l.priority_tier)} />
+              <span style={{ color: COLORS.textMuted, fontFamily: MONO, fontSize: "0.8em" }}>#{l.rank}</span>
               <span style={{ color: COLORS.text, fontWeight: 700, fontFamily: MONO }}>{l.account_id}</span>
               <span style={{ color: COLORS.textMuted, fontSize: "0.7em", fontFamily: MONO }}>{l.role}</span>
-              <span style={{ marginLeft: "auto", color: tierColor(l.priority_tier), fontWeight: 700, fontFamily: MONO }}>{l.priority_score} · {l.priority_tier}</span>
+              <span style={{ marginLeft: "auto", textAlign: "right" }}>
+                <span style={{ display: "block", color: tierColor(l.priority_tier), fontWeight: 700, fontFamily: MONO, fontSize: "0.8em" }}>{l.priority_tier}</span>
+                <span style={{ display: "block", color: COLORS.textMuted, fontFamily: MONO, fontSize: "0.62em" }}>driven by {SUB[Object.entries(l.sub_scores).sort((a, b) => b[1] - a[1])[0][0]] || "ML risk"}</span>
+              </span>
             </div>
             <div style={{ margin: "10px 0", display: "grid", gap: 4 }}>
               <Bar label="ML risk" value={l.sub_scores.ml} color={COLORS.high} />
