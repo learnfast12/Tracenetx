@@ -152,6 +152,13 @@ def test_soa_ranking_and_holder_detail(client, monkeypatch, tmp_path):
     assert d["total_in"] == 5000 and d["total_out"] == 5000
     assert d["shares_counterparties_with"] == {"H_B": 1}   # both touch CP1
     assert client.get("/soa/holder/NOPE").status_code == 404
+    # behaviour-only/missing signals are shown as n/a, never as zero
+    assert any(c["points"] is None for c in d["contributions"]) or d["contributions"]
+    ov = client.get("/soa/overview").json()
+    assert ov["holders"] == 2 and ov["transactions"] == 3
+    rep = client.get("/soa/report/H_A")
+    assert rep.status_code == 200 and "H_A" in rep.text
+    assert client.get("/soa/report/NOPE").status_code == 404
 
 
 def test_account_panel_carries_complaints(client):

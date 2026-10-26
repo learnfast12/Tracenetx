@@ -75,14 +75,21 @@ def features(u, shared_cps):
 
 def score(F):
     F = F.copy()
-    F["fan_raw"] = (F.cp_in.fillna(0) + F.cp_out.fillna(0)) / F.txns.clip(lower=1)
+    # no counterparty column -> the signal is unavailable (NaN), not "zero spread"
+    F["fan_raw"] = ((F.cp_in + F.cp_out) / F.txns.clip(lower=1)).where(F.cp_in.notna())
     F["fast_dwell_raw"] = -np.log1p(F.dwell_h)               # shorter dwell = higher risk
     raw = {"passthrough": F.passthrough, "fast_dwell": F.fast_dwell_raw, "fan": F.fan_raw,
            "burst": F.burst, "round": F["round"], "shared": F.shared}
     pct = pd.DataFrame({k: v.rank(pct=True) for k, v in raw.items()})   # NaN stays NaN (feature unavailable)
     w = pd.Series({k: WEIGHTS[k][0] for k in WEIGHTS})
     avail = pct.notna() * w
-    F["risk_score"] = (100 * (pct.fillna(0) * w).sum(axis=1) / avail.sum(axis=1)).round(1)
+    # points each signal adds to the 0-100 score (they sum to risk_score), so the UI can show the working
+    # An unavailable signal counts as NEUTRAL (50th percentile): it neither raises nor lowers the score, so a holder
+    # scored on fewer signals is not ranked above holders with full evidence. Weights sum to 1.0.
+    contrib = pct.fillna(0.5) * w * 100
+    for k in w.index:
+        F["c_" + k] = contrib[k].where(pct[k].notna()).round(1)         # NaN = signal not available
+    F["risk_score"] = contrib.sum(axis=1).round(1)
     F["reasons"] = [
         "; ".join(WEIGHTS[k][1] for k in WEIGHTS if pd.notna(pct.loc[i, k]) and pct.loc[i, k] >= 0.75) or "no standout signal"
         for i in F.index]
@@ -100,7 +107,8 @@ def main(d="soa_out", top=15):
     R = score(features(u, shared))
     cols = ["holder", "risk_score", "txns", "total_in", "total_out", "passthrough", "dwell_h", "graph_coverage",
             "signals_used", "reasons"]
-    R[cols].to_csv(f"{d}/soa_ranked.csv", index=False)
+    ccols = ["c_" + k for k in WEIGHTS]
+    R[cols + ccols].to_csv(f"{d}/soa_ranked.csv", index=False)
     pd.set_option("display.width", 250, "display.max_colwidth", 70)
     print(R[cols].head(top).round(2).to_string(index=False))
     print(f"\n{len(R)} holders scored -> {d}/soa_ranked.csv")
